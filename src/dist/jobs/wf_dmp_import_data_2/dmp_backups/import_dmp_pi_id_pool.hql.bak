@@ -1,0 +1,76 @@
+
+
+set hivevar:day2before;
+set hivevar:day5before;
+
+
+set hive.execution.engine=tez;
+set tez.queue.name=COMMON;
+set hive.exec.parallel=true;
+
+insert overwrite table dmp_pi.id_pool partition (part_date='${hivevar:day2before}')
+
+select distinct
+
+t.uid,
+t.ocb_id,
+t.sw_id,
+t.elev_id,
+t.mdnval
+
+from
+
+(
+
+
+      SELECT
+      ci_no                               as uid,
+      mbr_id                              as ocb_id,
+      ''                                  as sw_id,
+      ''                                  as elev_id,
+      clphn_no                            as mdnval 
+      FROM
+      ocb.mart_mbr_mst
+      WHERE ci_no IS NOT NULL AND length(ci_no)>0 AND ci_no <> '\n' AND ci_no not like '%\u0001%' 
+      AND mbr_sts_cd = 'A'
+
+
+      UNION ALL
+
+      SELECT
+      ci                                  as uid,
+      ''                                  as ocb_id,
+      member_id                           as sw_id,
+      ''                                  as elev_id,
+      mdn                                 as mdnval    
+      FROM
+      smartwallet.mt3_member
+      WHERE ci IS NOT NULL AND length(ci)>0 AND ci <> '\n' AND ci not like '%\u0001%' 
+      AND wallet_accept = 1 and wallet_accept1 = 1 and wallet_accept2 = 1 and vm_state_cd = '9' and length(last_auth_dt) = 14
+
+
+      UNION ALL
+
+      SELECT
+      mem_ci                              as uid,
+      ''                                  as ocb_id,
+      ''                                  as sw_id,
+      mem_no                              as elev_id,
+      ''                                  as mdnval 
+      FROM
+      11st.tb_evs_base_m_mb_mem
+      WHERE part_date='${hivevar:day2before}'
+      AND mem_ci IS NOT NULL AND length(mem_ci)>0 AND mem_ci <> '\n' AND mem_ci not like '%\u0001%' 
+      AND mem_clf = '01' AND mem_typ_cd = '01' AND mem_stat_cd = '01'
+
+
+) t
+;
+
+alter table dmp_pi.id_pool drop partition (part_date < '${hivevar:day5before}');
+
+
+
+
+
+

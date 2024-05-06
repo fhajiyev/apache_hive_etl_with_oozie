@@ -1,0 +1,96 @@
+USE user_tadsvc;
+
+set tez.queue.name=COMMON;
+set mapreduce.job.queuename=COMMON;
+set hive.execution.engine=tez;
+
+DROP TABLE IF EXISTS svc_csw1.svc_event_log;
+
+CREATE TABLE svc_csw1.svc_event_log
+(
+  d_uid       string,
+  m_slot      string,
+  client_type string,
+  ads         string,
+  score       double
+);
+
+set hivevar:from_dt;
+set hivevar:from_ts;
+set hivevar:to_dt;
+set hivevar:to_ts;
+
+INSERT OVERWRITE TABLE svc_csw1.svc_event_log
+SELECT
+  a.d_uid,
+  a.m_slot,
+  CASE WHEN SUBSTRING(a.m_client_id, 1, 1) = 'M' THEN 'W' ELSE 'A' END,
+  regexp_extract(a.ads, '[0-9]+', 0),
+ (
+  (
+   SUM(CASE WHEN CAST(a.k_event AS int) >= 200 THEN 1.0 ELSE 0 END * ${hivevar:term}/(UNIX_TIMESTAMP() - UNIX_TIMESTAMP(a.log_time, 'yyyy/MM/dd HH:mm:ss') + 1.0))
+   /
+   (SUM(CASE WHEN a.k_event = '0' THEN 1.0 ELSE 0 END) + 1.0)
+   *
+   100
+  )
+  + 
+  (
+  SUM(
+      (
+      CASE WHEN a.k_event = '0' THEN 1 WHEN a.k_event = '200' THEN 100 ELSE 50 END * ${hivevar:term}
+      )
+      /
+      (UNIX_TIMESTAMP() - UNIX_TIMESTAMP(a.log_time, 'yyyy/MM/dd HH:mm:ss') + 1.0)
+     )
+  )
+ ) * 10
+  AS score
+  FROM tad.log_server_event a
+ WHERE (
+        ( a.part_date >= '${hivevar:from_dt}' AND a.part_date <= '${hivevar:to_dt}' )
+        AND
+        ( a.log_time >= '${hivevar:from_ts}' AND a.log_time <= '${hivevar:to_ts}' )
+       )
+       AND (cps IS NOT NULL AND cps <> '')
+       AND (k_event >= '200')
+ GROUP BY a.d_uid, a.m_slot, CASE WHEN SUBSTRING(a.m_client_id, 1, 1) = 'M' THEN 'W' ELSE 'A' END, regexp_extract(a.ads, '[0-9]+', 0);
+
+DROP TABLE IF EXISTS user_tadsvc.mahout_syrupad_input;
+
+CREATE TABLE user_tadsvc.mahout_syrupad_input
+(
+  duid_sq   bigint,
+  ad_sq     bigint,
+  score     double
+)
+CLUSTERED BY (duid_sq, ad_sq) SORTED BY (duid_sq, ad_sq) INTO 256 BUCKETS
+ROW FORMAT 
+DELIMITED 
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n'
+STORED AS TEXTFILE
+LOCATION 'hdfs://skpds/user/tadsvc/syrupad/mahout_input';
+
+DROP TABLE IF EXISTS user_tadsvc.mahout_syrupad_output;
+
+CREATE EXTERNAL TABLE user_tadsvc.mahout_syrupad_output ( duid_sq bigint, value MAP<string, string> ) CLUSTERED BY (duid_sq) SORTED BY (duid_sq) INTO 256 BUCKETS ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t' ESCAPED BY '[' COLLECTION ITEMS TERMINATED BY ',' MAP KEYS TERMINATED BY ':' LINES TERMINATED BY '\n' STORED AS TEXTFILE LOCATION 'hdfs://skpds/user/tadsvc/syrupad/mahout_output';
+
+--CREATE EXTERNAL TABLE user_tadsvc.mahout_syrupad_output ( duid_sq bigint, ad_sq bigint, score double ) CLUSTERED BY (duid_sq) SORTED BY (duid_sq) INTO 256 BUCKETS ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' LINES TERMINATED BY '\n' STORED AS TEXTFILE LOCATION 'hdfs://skpds/user/tadsvc/syrupad/mahout_output'
+
+
+
+DROP TABLE IF EXISTS user_tadsvc.mahout_syrupad_users;
+
+CREATE TABLE user_tadsvc.mahout_syrupad_users
+(
+  duid_sq        bigint
+)
+CLUSTERED BY (duid_sq) SORTED BY (duid_sq) INTO 256 BUCKETS
+ROW FORMAT 
+DELIMITED 
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n'
+STORED AS TEXTFILE
+LOCATION 'hdfs://skpds/user/tadsvc/syrupad/mahout_users';
+

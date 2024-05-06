@@ -1,0 +1,39 @@
+<coordinator-app name="cd_dmp_${oozie_job_name}" frequency="${coord:minutes(cd_interval)}" start="${start}" end="${end}" timezone="${timezone}" xmlns="uri:oozie:coordinator:0.2">
+
+    <action>
+        <workflow>
+            <app-path>${workflowAppUri}</app-path>
+            <configuration>
+                <property>
+                    <name>from_yyyyMMdd</name>
+                    <value>${coord:formatTime(coord:dateOffset(coord:nominalTime(), ds_period, 'DAY'), 'yyyyMMdd')}</value>
+                </property>
+                <property>
+                    <name>to_yyyyMMdd</name>
+                    <value>${coord:formatTime(coord:actualTime(), 'yyyyMMdd')}</value>
+                </property>
+                <property>
+                    <name>from_yyyyMMddHH</name>
+                    <value>${coord:formatTime(coord:dateOffset(coord:nominalTime(), ds_period, 'DAY'), 'yyyyMMddHH')}</value>
+                </property>
+                <property>
+                    <name>to_yyyyMMddHH</name>
+                    <value>${coord:formatTime(coord:actualTime(), 'yyyyMMddHH')}</value>
+                </property>
+                <property>
+                    <name>from_yyyyMMddHHmm</name>
+                    <value>${coord:formatTime(coord:dateOffset(coord:nominalTime(), ds_period, 'DAY'), 'yyyyMMddHHmm')}</value>
+                </property>
+                <property>
+                    <name>to_yyyyMMddHHmm</name>
+                    <value>${coord:formatTime(coord:actualTime(), 'yyyyMMddHHmm')}</value>
+                </property>
+                <property>
+                    <name>oper_yyyyMMdd</name>
+                    <value>${coord:formatTime(coord:actualTime(), 'yyyyMMdd')}</value>
+                </property>
+            </configuration>
+        </workflow>
+    </action>
+
+</coordinator-app>

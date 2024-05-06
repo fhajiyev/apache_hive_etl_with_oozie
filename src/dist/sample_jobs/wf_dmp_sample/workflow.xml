@@ -1,0 +1,196 @@
+<workflow-app name="wf_dmp_sample" xmlns="uri:oozie:workflow:0.4">
+    <start to="test-mysql-query"/>
+
+    <action name="test-ssh-action">
+        <ssh xmlns="uri:oozie:ssh-action:0.1">
+            <host>dmp@DICc-t5if002</host>
+            <command>/app/di/impala-shell/impala-shell</command>
+            <args>-i</args>
+            <args>DICc-r3n051</args>
+            <args>-f</args>
+            <args>/app/home/tadsvc/retargeting_batch/5step_for_impala/01_svc_recommend_for_impala.iql</args>
+            <capture-output/>
+        </ssh>
+        <ok to="end"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="test-mysql-query">
+        <java>
+            <job-tracker>${jobTracker4DBif}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename </name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+
+            <main-class>com.skplanet.dmp.oozie.MySqlAction</main-class>
+            <arg>${mysqlConnection}</arg>
+            <arg>${mysqlUser}</arg>
+            <arg>${mysqlPassword}</arg>
+            <arg>select max(case when param_name = 'db_name' then param_value else null end) as "db_name",
+                max(case when param_name = 'table_name' then param_value else null end) as "table_name"
+                from dmp_parameter
+                where job_name = 'RET'
+            </arg>
+            <capture-output/>
+        </java>
+        <ok to="test-hql1"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="test-hql1">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename </name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>test_hql.hql</script>
+            <param>db_name=${wf:actionData('test-mysql-query')['db_name']}</param>
+            <param>table_name=${wf:actionData('test-mysql-query')['table_name']}</param>
+        </hive>
+        <ok to="test-import"/>
+        <error to="email-noti" />
+    </action>
+
+
+    <action name="test-hql2">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename </name>
+                    <value>${queueName}</value>
+                </property>
+
+            </configuration>
+            <jdbc-url>jdbc:hive2://172.22.224.37:11500</jdbc-url>
+            <script>test_hql.hql</script>
+            <param>db_name=${wf:actionData('test-mysql-query')['db_name']}</param>
+            <param>table_name=${wf:actionData('test-mysql-query')['table_name']}</param>
+        </hive2>
+        <ok to="end"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="test-create">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename </name>
+                    <value>${queueName}</value>
+                </property>
+                <!--
+                <property>
+                    <name>tez.lib.uris</name>
+                    <value>file:///app/tez/,file:///app/tez/lib/,file:///app/tez/tez-0.7.0.tar.gz</value>
+                </property>
+                -->
+            </configuration>
+            <jdbc-url>jdbc:hive2://172.22.224.37:11500</jdbc-url>
+            <script>test_create.hql</script>
+            <param>DB=${hiveDatabase}</param>
+            <param>from_dt=${from_yyyyMMdd}</param>
+        </hive2>
+        <ok to="test-delete-mysql-table"/>
+        <error to="email-noti" />
+    </action>
+
+    <!--
+    <fork name="fork-test">
+        <path start="test-export"/>
+    </fork>
+    -->
+
+    <action name="test-delete-mysql-table">
+        <java>
+            <job-tracker>${jobTracker4DBif}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename </name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+
+            <main-class>com.skplanet.dmp.oozie.MySqlAction</main-class>
+            <arg>${mysqlConnection}</arg>
+            <arg>${mysqlUser}</arg>
+            <arg>${mysqlPassword}</arg>
+            <arg>delete from log_test</arg>
+        </java>
+        <ok to="test-export"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="test-export">
+        <sqoop xmlns="uri:oozie:sqoop-action:0.2">
+            <job-tracker>${jobTracker4DBif}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <command>export --connect ${mysqlConnection} --driver ${mysqlDriver} --username ${mysqlUser} --password ${mysqlPassword} --table log_test --direct --export-dir ${hiveHdfsDir}/log_test</command>
+        </sqoop>
+        <ok to="test-delete"/>
+        <error to="email-noti" />
+    </action>
+
+    <!--
+    <join name="join-stat" to="test-delete"/>
+    -->
+
+    <action name="test-delete">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename </name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>test_delete.hql</script>
+            <param>DB=${hiveDatabase}</param>
+        </hive>
+        <ok to="test-import"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="test-import">
+        <sqoop xmlns="uri:oozie:sqoop-action:0.2">
+            <job-tracker>${jobTracker4DBif}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <command>import --connect ${mysqlConnection} --driver ${mysqlDriver} --username ${mysqlUser} --password ${mysqlPassword} --table log_test --direct --fetch-size 2000 -m 1 --hive-import --create-hive-table --hive-table user_tadsvc.log_test_mysql --delete-target-dir --target-dir ${hiveHdfsDir}/log_test_mysql --fields-terminated-by ,</command>
+        </sqoop>
+        <ok to="end"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="email-noti">
+        <email xmlns="uri:oozie:email-action:0.1">
+            <to>${emailNotiTo}</to>
+            <subject>[WF@${nameNode}]${(empty wf:lastErrorNode() )? 'SUCCESS' :	'FAILURE'} : ${wf:name()}(${wf:id()}, ${operYYYYMMDD})</subject>
+            <body>
+                <![CDATA[[${wf:name()}(${wf:id()})] in [${wf:appPath()}] at [${timestamp()}]<br>${(empty wf:lastErrorNode()) ? 'Workflow succeeded.' : 'Action failed.'}<br>${(empty wf:lastErrorNode()) ? '' : concat(concat(wf:lastErrorNode(), ' => '), wf:errorMessage(wf:lastErrorNode()))}<br>]]>
+            </body>
+        </email>
+        <ok to="kill" />
+        <error to="kill" />
+    </action>
+
+    <kill name="kill">
+        <message>Action failed, error message[${wf:errorMessage(wf:lastErrorNode())}]</message>
+    </kill>
+    <end name="end"/>
+</workflow-app>

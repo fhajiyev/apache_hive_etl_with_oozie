@@ -1,0 +1,494 @@
+<workflow-app name="wf_dmp_data_transfer_prepare_2" xmlns="uri:oozie:workflow:0.4">
+    <start to="original-datasets-prepare"/>
+
+    <!-- SSH action for category info retrieval from DB -->
+    <!--
+    <action name="retrieve-categories">
+        <ssh xmlns="uri:oozie:ssh-action:0.1">
+            <host>dmp@DSc-diif02</host>
+            <command>/app/home/dmp/dmp/dsp_categ_db/dmp_categ_access_script.sh</command>
+        </ssh>
+        <ok to="create-tables-step-01"/>
+        <error to="email-noti" />
+    </action>
+
+    -->
+
+    <action name="original-datasets-prepare">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/insert_dmp_data_curr.hql</script>
+            <param>today_dt=${oper_yyyyMMdd}</param>
+        </hive2>
+        <ok to="create-tables-step-01"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="create-tables-step-01">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/01_create_tables.hql</script>
+        </hive2>
+        <ok to="forkpaths"/>
+        <error to="email-noti" />
+    </action>
+
+    <fork name="forkpaths">
+        <!-- <path start="extract-diff"></path> -->
+        <path start="extract-full"></path>
+        <path start="populate-device-matching-table-step-04"></path>
+    </fork>
+
+    <!-- matching tables -->
+
+    <action name="extract-diff">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/02_01_extract_delta.hql</script>
+            <param>day2before=${day2before}</param>
+        </hive2>
+        <ok to="forkjoin"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="extract-full">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/02_02_extract_full.hql</script>
+            <param>day2before=${day2before}</param>
+        </hive2>
+        <ok to="forkjoin"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="populate-device-matching-table-step-04">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/04_populate_matching_table_devices.hql</script>
+            <param>today_dt=${oper_yyyyMMdd}</param>
+        </hive2>
+        <ok to="forkjoin"/>
+        <error to="email-noti" />
+    </action>
+
+    <join name="forkjoin" to="forkpaths-prepare-diff-full"/>
+
+    <!--
+    <action name="upload-backup-step-05">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>${ScriptPathHive}/05_upload_backup.hql</script>
+        </hive2>
+        <ok to="forkpaths-prepare-diff-full"/>
+        <error to="email-noti" />
+    </action>
+    -->
+
+    <fork name="forkpaths-prepare-diff-full">
+        <!-- <path start="data-upload-ocb-prepare-diff-step-05"></path> -->
+        <path start="data-upload-ocb-prepare-full-step-05"></path>
+
+        <!-- <path start="data-upload-sw-prepare-diff-step-05"></path> -->
+        <path start="data-upload-sw-prepare-full-step-05"></path>
+
+        <!-- <path start="data-upload-elev-prepare-diff-step-05"></path> -->
+        <path start="data-upload-elev-prepare-full-step-05"></path>
+
+
+        <path start="data-upload-mdnocb-prepare-full-step-05"></path>
+
+
+        <path start="data-upload-mdnsw-prepare-full-step-05"></path>
+
+        <!-- <path start="data-upload-device-prepare-diff-step-05"></path> -->
+        <path start="data-upload-device-prepare-full-step-05"></path>
+
+
+        <path start="data-upload-dmpid-prepare-full-step-05"></path>
+    </fork>
+
+
+    <!-- DMP ID -->
+    <action name="data-upload-dmpid-prepare-full-step-05">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/05_data_upload_prepare_full_dmpid.hql</script>
+            <param>current_hhmm=${oper_yyyyMMddHHmm}</param>
+        </hive2>
+        <ok to="forkjoin-to-views"/>
+        <error to="email-noti" />
+    </action>
+
+    <!-- DEVICES -->
+    <action name="data-upload-device-prepare-diff-step-05">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/05_data_upload_prepare_delta_device.hql</script>
+            <param>current_hhmm=${oper_yyyyMMddHHmm}</param>
+        </hive2>
+        <ok to="forkjoin-to-views"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="data-upload-device-prepare-full-step-05">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/05_data_upload_prepare_full_device.hql</script>
+            <param>current_hhmm=${oper_yyyyMMddHHmm}</param>
+        </hive2>
+        <ok to="forkjoin-to-views"/>
+        <error to="email-noti" />
+    </action>
+
+    <!-- OCB -->
+    <action name="data-upload-ocb-prepare-diff-step-05">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/05_data_upload_prepare_delta.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>dsp_id_type=${dsp_idtype_ocb}</param>
+            <param>current_hhmm=${oper_yyyyMMddHHmm}</param>
+        </hive2>
+        <ok to="forkjoin-to-views"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="data-upload-ocb-prepare-full-step-05">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/05_data_upload_prepare_full.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>dsp_id_type=${dsp_idtype_ocb}</param>
+            <param>current_hhmm=${oper_yyyyMMddHHmm}</param>
+        </hive2>
+        <ok to="forkjoin-to-views"/>
+        <error to="email-noti" />
+    </action>
+
+    <!-- SyrupWallet -->
+    <action name="data-upload-sw-prepare-diff-step-05">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/05_data_upload_prepare_delta.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>dsp_id_type=${dsp_idtype_sw}</param>
+            <param>current_hhmm=${oper_yyyyMMddHHmm}</param>
+        </hive2>
+        <ok to="forkjoin-to-views"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="data-upload-sw-prepare-full-step-05">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/05_data_upload_prepare_full.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>dsp_id_type=${dsp_idtype_sw}</param>
+            <param>current_hhmm=${oper_yyyyMMddHHmm}</param>
+        </hive2>
+        <ok to="forkjoin-to-views"/>
+        <error to="email-noti" />
+    </action>
+
+    <!-- 11st -->
+    <action name="data-upload-elev-prepare-diff-step-05">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/05_data_upload_prepare_delta.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>dsp_id_type=${dsp_idtype_elev}</param>
+            <param>current_hhmm=${oper_yyyyMMddHHmm}</param>
+        </hive2>
+        <ok to="forkjoin-to-views"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="data-upload-elev-prepare-full-step-05">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/05_data_upload_prepare_full.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>dsp_id_type=${dsp_idtype_elev}</param>
+            <param>current_hhmm=${oper_yyyyMMddHHmm}</param>
+        </hive2>
+        <ok to="forkjoin-to-views"/>
+        <error to="email-noti" />
+    </action>
+
+    <!-- MDN OCB -->
+    <action name="data-upload-mdnocb-prepare-diff-step-05">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/05_data_upload_prepare_delta.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>dsp_id_type=${dsp_idtype_mdnocb}</param>
+            <param>current_hhmm=${oper_yyyyMMddHHmm}</param>
+        </hive2>
+        <ok to="forkjoin-to-views"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="data-upload-mdnocb-prepare-full-step-05">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/05_data_upload_prepare_full.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>dsp_id_type=${dsp_idtype_mdnocb}</param>
+            <param>current_hhmm=${oper_yyyyMMddHHmm}</param>
+        </hive2>
+        <ok to="forkjoin-to-views"/>
+        <error to="email-noti" />
+    </action>
+
+    <!-- MDN SW -->
+    <action name="data-upload-mdnsw-prepare-diff-step-05">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/05_data_upload_prepare_delta.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>dsp_id_type=${dsp_idtype_mdnsw}</param>
+            <param>current_hhmm=${oper_yyyyMMddHHmm}</param>
+        </hive2>
+        <ok to="forkjoin-to-views"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="data-upload-mdnsw-prepare-full-step-05">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/05_data_upload_prepare_full.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>dsp_id_type=${dsp_idtype_mdnsw}</param>
+            <param>current_hhmm=${oper_yyyyMMddHHmm}</param>
+        </hive2>
+        <ok to="forkjoin-to-views"/>
+        <error to="email-noti" />
+    </action>
+
+    <join name="forkjoin-to-views" to="common-view-prepare"/>
+
+    <action name="common-view-prepare">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/06_common_view_prepare.hql</script>
+            <param>current_hhmm=${oper_yyyyMMddHHmm}</param>
+        </hive2>
+        <ok to="end"/>
+        <error to="email-noti" />
+    </action>
+
+    <!--
+    <action name="upload-restore-step-05">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>${ScriptPathHive}/05_upload_restore.hql</script>
+        </hive2>
+        <ok to="end"/>
+        <error to="email-noti" />
+    </action>
+    -->
+
+    <action name="email-noti">
+        <email xmlns="uri:oozie:email-action:0.1">
+            <to>${emailNotiTo}</to>
+            <subject>[WF@${nameNode}]${(empty wf:lastErrorNode() )? 'SUCCESS' :	'FAILURE'} : ${wf:name()}(${wf:id()}, ${oper_yyyyMMdd})</subject>
+            <body>
+                <![CDATA[[${wf:name()}(${wf:id()})] in [${wf:appPath()}] at [${timestamp()}]<br>${(empty wf:lastErrorNode()) ? 'Workflow succeeded.' : 'Action failed.'}<br>${(empty wf:lastErrorNode()) ? '' : concat(concat(wf:lastErrorNode(), ' => '), wf:errorMessage(wf:lastErrorNode()))}<br>]]>
+            </body>
+        </email>
+        <ok to="kill" />
+        <error to="kill" />
+    </action>
+
+    <kill name="kill">
+        <message>Action failed, error message[${wf:errorMessage(wf:lastErrorNode())}]</message>
+    </kill>
+    <end name="end"/>
+</workflow-app>

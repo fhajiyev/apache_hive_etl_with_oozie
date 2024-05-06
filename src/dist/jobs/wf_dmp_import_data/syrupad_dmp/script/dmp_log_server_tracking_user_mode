@@ -1,0 +1,121 @@
+
+set mapreduce.job.reduces=128;
+
+set hivevar:daybefore;
+set hivevar:day90before;
+set hivevar:day91before;
+
+ALTER TABLE SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_NEW  DROP IF EXISTS PARTITION(part_date=${hivevar:daybefore});
+
+set hive.exec.parallel = true;
+
+set hive.exec.dynamic.partition=true;
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+INSERT INTO SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_NEW  partition(PART_DATE)
+SELECT
+       DMP_UID       AS DMP_UID
+      ,''
+      ,MAX(AGE)      AS AGE
+      ,MAX(POINT)    AS POINT
+      ,MAX(GENCLASS) AS GENCLASS
+      ,null
+      ,null
+      ,null
+      ,null
+      ,null
+      ,null
+      ,null
+      ,null
+      ,null
+      ,null
+      ,'${hivevar:daybefore}'    AS PART_DATE
+ FROM (
+       SELECT
+              DMP_UID   AS DMP_UID
+             ,AGE       AS AGE
+             ,''        AS POINT
+             ,GENCLASS  AS GENCLASS
+         FROM SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_TEMP1_NEW
+        WHERE NOT (AGE  IN ('','-1') AND GENCLASS  IN ('','-2'))  --연령, 성별 모두 미인증이나 '' 값 제외
+
+       UNION ALL
+
+       SELECT
+             DMP_UID AS DMP_UID
+            ,''      AS AGE
+            ,POINT   AS POINT
+            ,''      AS GENCLASS
+        FROM SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_TEMP2_NEW
+      )  T101
+GROUP BY DMP_UID
+;
+
+INSERT INTO SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_NEW  partition(PART_DATE)
+SELECT
+       DMP_UID       AS DMP_UID
+      ,''
+      ,null
+      ,null
+      ,null
+      ,OCB_SERV
+      ,null
+      ,null
+      ,null
+      ,null
+      ,null
+      ,null
+      ,null
+      ,null
+      ,null
+      ,'${hivevar:daybefore}'    AS PART_DATE
+ FROM SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_TEMP3_NEW
+ ;
+
+-- INSERT INTO SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_NEW  partition(PART_DATE)
+-- SELECT
+--        DMP_UID       AS DMP_UID
+--       ,''
+--       ,null
+--       ,null
+--       ,null
+--       ,null
+--       ,null
+--       ,UPPER(MOD_NAME)
+--       ,UPPER(MOD_MANUF)
+--       ,UPPER(CASE WHEN TRIM(SERV_NAME) = 'LG U' THEN 'LG U+' ELSE SERV_NAME END)
+--       ,null
+--       ,null
+--       ,null
+--       ,null
+--       ,null
+--       ,'${hivevar:daybefore}'    AS PART_DATE
+--  FROM SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_TEMP4_NEW
+--  ;
+
+INSERT INTO SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_NEW  partition(PART_DATE)
+SELECT
+       DMP_UID       AS DMP_UID
+      ,''
+      ,null
+      ,null
+      ,null
+      ,null
+      ,UPPER(MBR_CLASS)
+      ,null
+      ,null
+      ,null
+      ,null
+      ,null
+      ,null
+      ,null
+      ,null
+      ,'${hivevar:daybefore}'    AS PART_DATE
+ FROM SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_TEMP5_NEW
+ ;
+
+
+
+
+ALTER TABLE SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_NEW  DROP IF EXISTS PARTITION(part_date=${hivevar:day91before});
+

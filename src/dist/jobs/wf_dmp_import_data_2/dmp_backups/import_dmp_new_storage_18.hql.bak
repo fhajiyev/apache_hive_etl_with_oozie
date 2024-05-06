@@ -1,0 +1,180 @@
+
+
+set hivevar:day2before;
+set hivevar:day5before;
+
+set hive.merge.mapfiles=true;
+set hive.merge.mapredfiles=true;
+set hive.merge.smallfiles.avgsize=67108864;
+set hive.merge.size.per.task=134217728;
+set hive.merge.tezfiles=true;
+
+set hive.execution.engine=tez;
+set tez.queue.name=COMMON;
+set hive.exec.parallel=true;
+
+insert overwrite table dmp_pi.prod_data_source_store partition (part_hour='${hivevar:day2before}00', data_source_id='18')
+
+
+
+   SELECT
+
+   aa.mem_ci,
+   'Y',
+   aa.bgn_ent_dy,
+   aa.noti_shp_evt_bnft_inst_yn,
+   '',
+   aa.thm_pchsr_grd_nm,
+   aa.age,
+   aa.gndr,
+   aa.natv_yn,
+   '',
+
+
+   '',
+   '','','','','','','','','','',
+   '','','','','','','','','','',
+   '','','','','','','','','','',
+   '','','','','','','','','','',
+   '','','','','','','','','','',
+   '','','','','','','','','','',
+   '','','','','','','','','','',
+   '','','','','','','','','','',
+   '','','','','','','','','','',
+   '${hivevar:day2before}00'
+
+
+   FROM
+
+   (
+
+   SELECT
+
+   a.mem_ci,
+
+   if (c.bgn_ent_dy                is null,  '',   REGEXP_REPLACE(SUBSTR(c.bgn_ent_dy,1,10),'-','')) as bgn_ent_dy,  
+   if (e.noti_shp_evt_bnft_inst_yn is null, 'N',   e.noti_shp_evt_bnft_inst_yn) as noti_shp_evt_bnft_inst_yn,
+   if (g.cmlt_pnt                  is null,  '',   g.cmlt_pnt) as cmlt_pnt,
+   if (d.thm_pchsr_grd_nm          is null,  '',   REGEXP_REPLACE(d.thm_pchsr_grd_nm, '등급', '')) as thm_pchsr_grd_nm, 
+   if (a.age                       is null or a.age = '',  '',   CAST(a.age as int)) as age,
+
+   CASE
+        WHEN a.gndr is null OR a.gndr NOT IN ('M','F') THEN ''
+        ELSE a.gndr
+   END as gndr,
+
+   CASE
+        WHEN d.natv_yn is null THEN ''
+        WHEN d.natv_yn = 'Y' THEN 'L'
+        WHEN d.natv_yn = 'N' THEN 'F'
+        ELSE ''
+   END as natv_yn,
+
+   if (d.mrrg_yn                    is null,  '',   d.mrrg_yn)  as mrrg_yn
+
+
+   FROM
+
+   (
+
+     SELECT DISTINCT
+
+     mem_no,
+     age,
+     gndr,
+     mem_ci
+
+     FROM
+     11st.tb_evs_base_m_mb_mem 
+     WHERE 
+     part_date = '${hivevar:day2before}'
+     AND mem_ci IS NOT NULL AND mem_ci <> '' AND mem_ci not like '%\u0001%'
+     AND mem_clf = '01' AND mem_typ_cd = '01' AND mem_stat_cd = '01'
+
+   ) a
+
+   INNER JOIN
+
+   (
+
+    SELECT DISTINCT
+
+    mem_no,
+    bgn_ent_dy    
+
+    FROM
+    11st.tb_evs_ods_m_mb_mem
+    WHERE
+    part_date = '${hivevar:day2before}'
+
+   ) c
+   
+   ON a.mem_no = c.mem_no
+  
+   INNER JOIN
+
+   (
+
+    SELECT DISTINCT
+   
+    mbr_no,   
+    thm_pchsr_grd_nm,
+    natv_yn,
+    mrrg_yn
+ 
+    FROM
+    11st.tb_evs_dw_m_mbr_info 
+    WHERE
+    p_yyyymmdd = '${hivevar:day2before}'
+
+   ) d
+
+   ON a.mem_no = d.mbr_no
+
+   LEFT JOIN
+
+   (
+      
+     SELECT DISTINCT
+     
+     mem_no,
+     cmlt_pnt
+
+     FROM
+     11st.tb_evs_ods_f_mt_pnt
+     WHERE
+     part_date = '${hivevar:day2before}'
+     AND
+     pnt_kd_cd IS NOT NULL AND pnt_kd_cd = '07'     
+
+   ) g
+
+   ON a.mem_no = g.mem_no
+
+   LEFT JOIN
+
+   (
+     SELECT DISTINCT
+ 
+     mem_no,
+     noti_shp_evt_bnft_inst_yn
+
+     FROM
+     11st.tb_evs_ods_m_mo_app_push_info
+     WHERE
+     part_date = '${hivevar:day2before}'
+
+   ) e
+
+   ON a.mem_no = e.mem_no
+
+
+   ) aa
+
+
+;
+
+alter table dmp_pi.prod_data_source_store drop partition (part_hour < '${hivevar:day5before}00', data_source_id='18');
+alter table dmp_pi.prod_data_source_store_parquet drop partition (part_hour < '${hivevar:day5before}00', data_source_id='18');
+
+

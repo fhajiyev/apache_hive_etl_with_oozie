@@ -1,0 +1,2 @@
+LOAD DATA LOCAL INPATH '/app/home/tadsvc/syrupaddmp_batch/meta/dmp_syrup_meta_log.txt' INTO TABLE SVC_CSW1.DMP_SYRUP_META_LOG;
+

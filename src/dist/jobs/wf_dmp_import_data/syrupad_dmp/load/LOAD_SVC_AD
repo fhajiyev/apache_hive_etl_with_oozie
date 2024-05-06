@@ -1,0 +1,48 @@
+
+USE SVC_CSW1;
+
+INSERT OVERWRITE TABLE DMP_SVC_AD
+SELECT
+ CASE WHEN REGEXP_REPLACE(AD_SQ, ',', ' ') = 'null'                             THEN '' ELSE REGEXP_REPLACE(AD_SQ, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(CAMPAIGN_SQ, ',', ' ') = 'null'                       THEN '' ELSE REGEXP_REPLACE(CAMPAIGN_SQ, ',', ' ') END, 
+ CASE WHEN REGEXP_REPLACE(SLOT_SQ, ',', ' ') = 'null'                           THEN '' ELSE REGEXP_REPLACE(SLOT_SQ, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(AD_NM, ',', ' ') = 'null'                             THEN '' ELSE REGEXP_REPLACE(AD_NM, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(CHANNEL_BIT, ',', ' ') = 'null'                       THEN '' ELSE REGEXP_REPLACE(CHANNEL_BIT, ',', ' ') END, 
+ CASE WHEN REGEXP_REPLACE(AD_STATUS_CD, ',', ' ') = 'null'                      THEN '' ELSE REGEXP_REPLACE(AD_STATUS_CD, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(START_DT, ',', ' ') = 'null'                          THEN '' ELSE REGEXP_REPLACE(START_DT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(END_DT, ',', ' ') = 'null'                            THEN '' ELSE REGEXP_REPLACE(END_DT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(PAUSE_START_DT, ',', ' ') = 'null'                    THEN '' ELSE REGEXP_REPLACE(PAUSE_START_DT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(PAUSE_END_DT, ',', ' ') = 'null'                      THEN '' ELSE REGEXP_REPLACE(PAUSE_END_DT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(CONTRACT_PRICE_AMT, ',', ' ') = 'null'                THEN '' ELSE REGEXP_REPLACE(CONTRACT_PRICE_AMT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(SERVICE_RATE, ',', ' ') = 'null'                      THEN '' ELSE REGEXP_REPLACE(SERVICE_RATE, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(PRICE_AMT, ',', ' ') = 'null'                         THEN '' ELSE REGEXP_REPLACE(PRICE_AMT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(FREE_AD_FL, ',', ' ') = 'null'                        THEN '' ELSE REGEXP_REPLACE(FREE_AD_FL, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(SOHO_FL, ',', ' ') = 'null'                           THEN '' ELSE REGEXP_REPLACE(SOHO_FL, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(BILL_TYPE_CD, ',', ' ') = 'null'                      THEN '' ELSE REGEXP_REPLACE(BILL_TYPE_CD, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(AD_CATEGORY_CD, ',', ' ') = 'null'                    THEN '' ELSE REGEXP_REPLACE(AD_CATEGORY_CD, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(BUDGET_AMT, ',', ' ') = 'null'                        THEN '' ELSE REGEXP_REPLACE(BUDGET_AMT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(DAILY_GOAL_AMT, ',', ' ') = 'null'                    THEN '' ELSE REGEXP_REPLACE(DAILY_GOAL_AMT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(GOAL_VALUE_AMT, ',', ' ') = 'null'                    THEN '' ELSE REGEXP_REPLACE(GOAL_VALUE_AMT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(FREQ_AMT, ',', ' ') = 'null'                          THEN '' ELSE REGEXP_REPLACE(FREQ_AMT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(FREQ_DAY_AMT, ',', ' ') = 'null'                      THEN '' ELSE REGEXP_REPLACE(FREQ_DAY_AMT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(TIME_BUDGET_CD, ',', ' ') = 'null'                    THEN '' ELSE REGEXP_REPLACE(TIME_BUDGET_CD, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(WEIGHT_FL, ',', ' ') = 'null'                         THEN '' ELSE REGEXP_REPLACE(WEIGHT_FL, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(APP_WEIGHT_RATE, ',', ' ') = 'null'                   THEN '' ELSE REGEXP_REPLACE(APP_WEIGHT_RATE, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(MWEB_WEIGHT_RATE, ',', ' ') = 'null'                  THEN '' ELSE REGEXP_REPLACE(MWEB_WEIGHT_RATE, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(APP_SLICE_GOAL, ',', ' ') = 'null'                    THEN '' ELSE REGEXP_REPLACE(APP_SLICE_GOAL, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(MWEB_SLICE_GOAL, ',', ' ') = 'null'                   THEN '' ELSE REGEXP_REPLACE(MWEB_SLICE_GOAL, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(LIVE_IMPS_CNT, ',', ' ') = 'null'                     THEN '' ELSE REGEXP_REPLACE(LIVE_IMPS_CNT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(LIVE_CLICKS_CNT, ',', ' ') = 'null'                   THEN '' ELSE REGEXP_REPLACE(LIVE_CLICKS_CNT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(LIVED_FL, ',', ' ') = 'null'                          THEN '' ELSE REGEXP_REPLACE(LIVED_FL, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(DSP_SQ, ',', ' ') = 'null'                            THEN '' ELSE REGEXP_REPLACE(DSP_SQ, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(REJECT_REASON, ',', ' ') = 'null'                     THEN '' ELSE REGEXP_REPLACE(REJECT_REASON, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(REJECT_DT, ',', ' ') = 'null'                         THEN '' ELSE REGEXP_REPLACE(REJECT_DT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(CREATE_DT, ',', ' ') = 'null'                         THEN '' ELSE REGEXP_REPLACE(CREATE_DT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(UPDATE_DT, ',', ' ') = 'null'                         THEN '' ELSE REGEXP_REPLACE(UPDATE_DT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(CREATE_ACCOUNT_SQ, ',', ' ') = 'null'                 THEN '' ELSE REGEXP_REPLACE(CREATE_ACCOUNT_SQ, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(UPDATE_ACCOUNT_SQ, ',', ' ') = 'null'                 THEN '' ELSE REGEXP_REPLACE(UPDATE_ACCOUNT_SQ, ',', ' ') END
+
+FROM TEMP_DMP_SVC_AD
+WHERE
+cast(AD_SQ as bigint) IS NOT NULL
+;

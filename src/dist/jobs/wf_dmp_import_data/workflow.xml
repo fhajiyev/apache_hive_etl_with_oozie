@@ -1,0 +1,2150 @@
+<workflow-app name="wf_dmp_import_data" xmlns="uri:oozie:workflow:0.4">
+    <start to="select_job"/>
+
+    <decision name="select_job">
+        <switch>
+            <case to="drop_segment">
+                ${(oozie_job_name == "1daily_job_for_import_mysql_segment")}
+            </case>
+            <case to="dmp-log-server-tracking-user-mode-start">
+                ${(oozie_job_name == "1daily_job_for_import_syrupad_dmp")}
+            </case>
+            <case to="import_syrupad_dmp_hr">
+                ${(oozie_job_name == "1hourly_job_for_import_syrupad_dmp")}
+            </case>
+            <case to="import_syrupad_retargeting">
+                ${(oozie_job_name == "1hourly_job_for_import_syrupad_retargeting")}
+            </case>
+            <case to="import_recopick">
+                ${(oozie_job_name == "1daily_job_for_import_recopick")}
+            </case>
+            <case to="import_oksusu">
+                ${(oozie_job_name == "1daily_job_for_import_oksusu")}
+            </case>
+            <case to="import_syrupad_pbp">
+                ${(oozie_job_name == "1hourly_job_for_import_syrupad_pbp")}
+            </case>
+            <case to="end">
+                ${(oozie_job_name != "1daily_job_for_import_syrupad_dmp")}
+            </case>
+            <default to="end"/>
+        </switch>
+    </decision>
+
+    <action name="drop_segment">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/syrupad_dmp/drop_segment.hql</script>
+        </hive2>
+        <ok to="import_mysql_segment"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="import_mysql_segment">
+        <sqoop xmlns="uri:oozie:sqoop-action:0.2">
+            <job-tracker>${jobTracker4DBif}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <command>import --connect ${mysqlConnection} --driver ${mysqlDriver} --username ${mysqlUser} --password ${mysqlPassword} --table segment --direct --fetch-size 2000 -m 1 --hive-import --create-hive-table --hive-table svc_ds_dmp.segment --delete-target-dir --target-dir ${hiveHdfsDir}/segment</command>
+        </sqoop>
+        <ok to="segment_for_impala"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="segment_for_impala">
+        <ssh xmlns="uri:oozie:ssh-action:0.1">
+            <host>dmp@DSc-diif02</host>
+            <command>${syrupad_dmp_ssh_action_home}/segment_for_impala.sh</command>
+            <capture-output/>
+        </ssh>
+        <ok to="end"/>
+        <error to="email-noti" />
+    </action>
+
+    <!-- HOURLY BATCH -->
+
+    <fork name="import_syrupad_dmp_hr">
+        <path start="import-dmp-2-63-hr"></path>
+        <path start="import-dmp-2-71-hr"></path>
+        <path start="dmp-recopick-map-table-prepare"></path>
+        <path start="import-dmp-2-113-hr"></path>
+        <path start="import-dmp-2-93-hr"></path>
+    </fork>
+
+    <!-- branch 1 -->
+
+                    <!--
+                    <action name="import-dmp-2-63-hr-start">
+                        <ssh xmlns="uri:oozie:ssh-action:0.1">
+                            <host>dmp@DSc-diif02</host>
+                            <command>echo "end_time=`date '+%s'`"</command>
+                            <capture-output/>
+                        </ssh>
+                        <ok to="import-dmp-2-63-hr"/>
+                        <error to="email-noti" />
+                    </action>
+                    -->
+
+    <action name="import-dmp-2-63-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_63.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-64-hr"/>
+        <error to="email-noti" />
+    </action>
+
+                    <!--
+                    <action name="import-dmp-2-63-hr-end">
+                        <ssh xmlns="uri:oozie:ssh-action:0.1">
+                            <host>dmp@DSc-diif02</host>
+                            <command>echo "end_time=`date '+%s'`"</command>
+                            <capture-output/>
+                        </ssh>
+                        <ok to="import-dmp-2-64-hr"/>
+                        <error to="email-noti" />
+                    </action>
+                    -->
+
+    <action name="import-dmp-2-64-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_64.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-65-hr"/>
+        <error to="email-noti" />
+    </action>
+
+                    <!--
+                    <action name="import-dmp-2-64-hr-end">
+                        <ssh xmlns="uri:oozie:ssh-action:0.1">
+                            <host>dmp@DSc-diif02</host>
+                            <command>echo "end_time=`date '+%s'`"</command>
+                            <capture-output/>
+                        </ssh>
+                        <ok to="import-dmp-2-65-hr"/>
+                        <error to="email-noti" />
+                    </action>
+                    -->
+
+    <action name="import-dmp-2-65-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_65.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-67-hr"/>
+        <error to="email-noti" />
+    </action>
+
+                    <!--
+                    <action name="import-dmp-2-65-hr-end">
+                        <ssh xmlns="uri:oozie:ssh-action:0.1">
+                            <host>dmp@DSc-diif02</host>
+                            <command>echo "end_time=`date '+%s'`"</command>
+                            <capture-output/>
+                        </ssh>
+                        <ok to="import-dmp-2-67-hr"/>
+                        <error to="email-noti" />
+                    </action>
+                    -->
+
+    <action name="import-dmp-2-67-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_67.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-68-hr"/>
+        <error to="email-noti" />
+    </action>
+
+                    <!--
+                    <action name="import-dmp-2-67-hr-end">
+                        <ssh xmlns="uri:oozie:ssh-action:0.1">
+                            <host>dmp@DSc-diif02</host>
+                            <command>echo "end_time=`date '+%s'`"</command>
+                            <capture-output/>
+                        </ssh>
+                        <ok to="import-dmp-2-68-hr"/>
+                        <error to="email-noti" />
+                    </action>
+                    -->
+
+    <action name="import-dmp-2-68-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_68.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-117-hr"/>
+        <error to="email-noti" />
+    </action>
+
+                    <!--
+                    <action name="import-dmp-2-68-hr-end">
+                        <ssh xmlns="uri:oozie:ssh-action:0.1">
+                            <host>dmp@DSc-diif02</host>
+                            <command>echo "end_time=`date '+%s'`"</command>
+                            <capture-output/>
+                        </ssh>
+                        <ok to="join-all-dmp-import-hr"/>
+                        <error to="email-noti" />
+                    </action>
+                    -->
+
+    <action name="import-dmp-2-117-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_117.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="join-all-dmp-import-hr"/>
+        <error to="email-noti" />
+    </action>
+
+
+    <!-- branch 2 -->
+
+                    <!--
+                    <action name="import-dmp-2-71-hr-start">
+                        <ssh xmlns="uri:oozie:ssh-action:0.1">
+                            <host>dmp@DSc-diif02</host>
+                            <command>echo "start_time=`date '+%s'`"</command>
+                            <capture-output/>
+                        </ssh>
+                        <ok to="import-dmp-2-71-hr"/>
+                        <error to="email-noti" />
+                    </action>
+                    -->
+
+    <action name="import-dmp-2-71-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_71.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-77-hr"/>
+        <error to="email-noti" />
+    </action>
+
+                    <!--
+                    <action name="import-dmp-2-71-hr-end">
+                        <ssh xmlns="uri:oozie:ssh-action:0.1">
+                            <host>dmp@DSc-diif02</host>
+                            <command>echo "end_time=`date '+%s'`"</command>
+                            <capture-output/>
+                        </ssh>
+                        <ok to="import-dmp-2-72-hr"/>
+                        <error to="email-noti" />
+                    </action>
+                    -->
+
+    <action name="import-dmp-2-77-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_77.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-82-hr"/>
+        <error to="email-noti" />
+    </action>
+
+                    <!--
+                    <action name="import-dmp-2-77-hr-end">
+                        <ssh xmlns="uri:oozie:ssh-action:0.1">
+                            <host>dmp@DSc-diif02</host>
+                            <command>echo "end_time=`date '+%s'`"</command>
+                            <capture-output/>
+                        </ssh>
+                        <ok to="import-dmp-2-82-hr"/>
+                        <error to="email-noti" />
+                    </action>
+                    -->
+
+    <action name="import-dmp-2-82-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_82.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-89-hr"/>
+        <error to="email-noti" />
+    </action>
+
+                    <!--
+                    <action name="import-dmp-2-82-hr-end">
+                        <ssh xmlns="uri:oozie:ssh-action:0.1">
+                            <host>dmp@DSc-diif02</host>
+                            <command>echo "end_time=`date '+%s'`"</command>
+                            <capture-output/>
+                        </ssh>
+                        <ok to="import-dmp-2-89-hr"/>
+                        <error to="email-noti" />
+                    </action>
+                    -->
+
+    <action name="import-dmp-2-89-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_89.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-97-hr"/>
+        <error to="email-noti" />
+    </action>
+
+                    <!--
+                    <action name="import-dmp-2-89-hr-end">
+                        <ssh xmlns="uri:oozie:ssh-action:0.1">
+                            <host>dmp@DSc-diif02</host>
+                            <command>echo "end_time=`date '+%s'`"</command>
+                            <capture-output/>
+                        </ssh>
+                        <ok to="import-dmp-2-97-hr"/>
+                        <error to="email-noti" />
+                    </action>
+                    -->
+
+    <action name="import-dmp-2-97-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_97.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="join-all-dmp-import-hr"/>
+        <error to="email-noti" />
+    </action>
+
+                    <!--
+                    <action name="import-dmp-2-97-hr-end">
+                        <ssh xmlns="uri:oozie:ssh-action:0.1">
+                            <host>dmp@DSc-diif02</host>
+                            <command>echo "end_time=`date '+%s'`"</command>
+                            <capture-output/>
+                        </ssh>
+                        <ok to="join-all-dmp-import-hr"/>
+                        <error to="email-noti" />
+                    </action>
+                    -->
+
+    <!-- branch 3 -->
+
+    <action name="dmp-recopick-map-table-prepare">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import/recopick_map_table_prepare.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day90before=${day90before}</param>
+            <param>day5before=${day5before}</param>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-72-hr"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="import-dmp-2-72-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_72.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-118-hr"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="import-dmp-2-118-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_118.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-137-hr"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="import-dmp-2-137-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_137.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="join-all-dmp-import-hr"/>
+        <error to="email-noti" />
+    </action>
+
+    <!--
+    <action name="import-dmp-2-00-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_audience_upload.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+            <param>daycurr=${oper_yyyyMMdd}</param>
+            <param>hourbefore=${hourbefore}</param>
+        </hive2>
+        <ok to="join-all-dmp-import-hr"/>
+        <error to="email-noti" />
+    </action>
+    -->
+
+    <!-- branch 4 -->
+
+    <action name="import-dmp-2-113-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_113.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-114-hr"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="import-dmp-2-114-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_114.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-115-hr"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="import-dmp-2-115-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_115.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-116-hr"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="import-dmp-2-116-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_116.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-123-hr"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="import-dmp-2-123-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_123.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-00-hr"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="import-dmp-2-00-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_audience_upload.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="join-all-dmp-import-hr"/>
+        <error to="email-noti" />
+    </action>
+
+
+    <!-- branch 5 -->
+
+    <action name="import-dmp-2-93-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_93.hql</script>
+            <param>hour10before=${hour10before}</param>
+        </hive2>
+        <ok to="import-dmp-2-110-hr"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="import-dmp-2-110-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_110.hql</script>
+            <param>hour10before=${hour10before}</param>
+        </hive2>
+        <ok to="import-dmp-2-111-hr"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="import-dmp-2-111-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_111.hql</script>
+            <param>hour10before=${hour10before}</param>
+        </hive2>
+        <ok to="import-dmp-2-122-hr"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="import-dmp-2-122-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_122.hql</script>
+            <param>hour10before=${hour10before}</param>
+        </hive2>
+        <ok to="import-dmp-2-124-hr"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="import-dmp-2-124-hr">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/import_dmp_new_storage_124.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="join-all-dmp-import-hr"/>
+        <error to="email-noti" />
+    </action>
+
+    <join name="join-all-dmp-import-hr" to="rename-partition"/>
+
+    <fork name="rename-partition">
+        <path start="rename-partition-1"></path>
+        <path start="rename-partition-2"></path>
+        <path start="rename-partition-3"></path>
+    </fork>
+
+    <!-- OTHERS -->
+    <action name="rename-partition-1">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/rename_partition1.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour10before=${hour10before}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="join-rename-partition"/>
+        <error to="email-noti" />
+    </action>
+
+    <!-- TUNE -->
+    <action name="rename-partition-2">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/rename_partition2.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour10before=${hour10before}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="join-rename-partition"/>
+        <error to="email-noti" />
+    </action>
+
+    <!-- AUDIENCE UPLOAD -->
+    <action name="rename-partition-3">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/hourly/rename_partition3.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour10before=${hour10before}</param>
+            <param>hour91before=${hour91before}</param>
+        </hive2>
+        <ok to="join-rename-partition"/>
+        <error to="email-noti" />
+    </action>
+
+    <join name="join-rename-partition" to="fs-success-hr-1"/>
+
+    <action name="fs-success-hr-1" retry-max="2" retry-interval="5">
+        <fs>
+            <touchz path="hdfs://skpds/user/hive/warehouse/dmp.db/prod_data_source_store/part_hour=${hourbefore}/_SUCCESS_HOURLY" />
+        </fs>
+        <ok to="fs-success-hr-2" />
+        <error to="email-noti" />
+    </action>
+
+    <action name="fs-success-hr-2" retry-max="2" retry-interval="5">
+        <fs>
+            <touchz path="hdfs://skpds/user/hive/warehouse/dmp.db/prod_data_source_store_parquet/part_hour=${hourbefore}/_SUCCESS_HOURLY" />
+        </fs>
+        <ok to="impala-parquet" />
+        <error to="email-noti" />
+    </action>
+
+
+    <action name="impala-parquet">
+        <ssh xmlns="uri:oozie:ssh-action:0.1">
+            <host>dmp@DSc-diif02</host>
+            <command>/app/home/dmp/dmp/jobs/wf_dmp_import_data/impala/parquet_prepare_hr.sh</command>
+        </ssh>
+        <ok to="end"/>
+        <error to="email-noti" />
+    </action>
+
+
+
+
+    <!-- DAILY BATCH -->
+
+    <fork name="dmp-log-server-tracking-user-mode-start">
+        <path start="dmp-log-server-tracking-user-mode-1"></path>
+        <path start="dmp-log-server-tracking-user-mode-2"></path>
+        <path start="dmp-log-server-tracking-user-mode-3"></path>
+        <path start="dmp-log-server-tracking-user-mode-5"></path>
+    </fork>
+
+    <action name="dmp-log-server-tracking-user-mode-1">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>${ScriptPathHive}/dmp_log_server_tracking_user_mode1</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+        </hive>
+        <ok to="join-all-tracking"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+    <action name="dmp-log-server-tracking-user-mode-2">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>${ScriptPathHive}/dmp_log_server_tracking_user_mode2</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+        </hive>
+        <ok to="join-all-tracking"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+    <action name="dmp-log-server-tracking-user-mode-3">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>${ScriptPathHive}/dmp_log_server_tracking_user_mode3</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+        </hive>
+        <ok to="join-all-tracking"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+    <action name="dmp-log-server-tracking-user-mode-5">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>${ScriptPathHive}/dmp_log_server_tracking_user_mode5</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+        </hive>
+        <ok to="join-all-tracking"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+    <join name="join-all-tracking" to="dmp-log-server-tracking-user-mode"/>
+
+    <action name="dmp-log-server-tracking-user-mode">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>${ScriptPathHive}/dmp_log_server_tracking_user_mode</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+        </hive>
+        <ok to="import_syrupad_dmp_2"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+    <!-- end of additional data load routine for DMP task -->
+
+    <fork name="import_syrupad_dmp_2">
+        <!-- <path start="import-dmp-1"></path> -->
+        <path start="import-dmp-2-62"></path><!--<path start="import-dmp-2-62-start"></path>-->
+        <path start="import-dmp-2-70"></path><!--<path start="import-dmp-2-70-start"></path>-->
+        <path start="import-dmp-2-130"></path>
+        <path start="import-dmp-2-129"></path>
+    </fork>
+
+
+    <action name="import-dmp-1">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/syrupad_dmp/import_syrupad_dmp.hql</script>
+            <param>db=${hiveDatabase}</param>
+            <param>dmp_site_id=${dmp_site_id}</param>
+            <param>dmp_data_source_id=${dmp_data_source_id}</param>
+            <param>from_dt=${from_yyyyMMdd}</param>
+            <param>to_dt=${to_yyyyMMdd}</param>
+        </hive2>
+        <ok to="join-all-dmp-import"/>
+        <error to="email-noti" />
+    </action>
+
+    <!-- branch 1 -->
+
+                        <!--
+                        <action name="import-dmp-2-62-start">
+                            <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                <host>dmp@DSc-diif02</host>
+                                <command>echo "start_time=`date '+%s'`"</command>
+                                <capture-output/>
+                            </ssh>
+                            <ok to="import-dmp-2-62"/>
+                            <error to="email-noti" />
+                        </action>
+                        -->
+
+    <action name="import-dmp-2-62">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_62.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+            <param>daycurr=${oper_yyyyMMdd}</param>
+        </hive2>
+        <ok to="import-dmp-2-69"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                        <!--
+                        <action name="import-dmp-2-62-end">
+                            <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                <host>dmp@DSc-diif02</host>
+                                <command>echo "end_time=`date '+%s'`"</command>
+                                <capture-output/>
+                            </ssh>
+                            <ok to="import-dmp-2-69"/>
+                            <error to="email-noti" />
+                        </action>
+                        -->
+
+    <action name="import-dmp-2-69">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_69.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+            <param>daycurr=${oper_yyyyMMdd}</param>
+        </hive2>
+        <ok to="import-dmp-2-91"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                        <!--
+                        <action name="import-dmp-2-69-end">
+                            <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                <host>dmp@DSc-diif02</host>
+                                <command>echo "end_time=`date '+%s'`"</command>
+                                <capture-output/>
+                            </ssh>
+                            <ok to="import-dmp-2-91"/>
+                            <error to="email-noti" />
+                        </action>
+                        -->
+
+    <action name="import-dmp-2-91">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_91.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-85"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                        <!--
+                        <action name="import-dmp-2-91-end">
+                            <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                <host>dmp@DSc-diif02</host>
+                                <command>echo "end_time=`date '+%s'`"</command>
+                                <capture-output/>
+                            </ssh>
+                            <ok to="import-dmp-2-85"/>
+                            <error to="email-noti" />
+                        </action>
+                        -->
+
+    <action name="import-dmp-2-85">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_85.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-105"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                        <!--
+                        <action name="import-dmp-2-85-end">
+                            <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                <host>dmp@DSc-diif02</host>
+                                <command>echo "end_time=`date '+%s'`"</command>
+                                <capture-output/>
+                            </ssh>
+                            <ok to="import-dmp-2-94"/>
+                            <error to="email-noti" />
+                        </action>
+                        -->
+
+    <!--
+    <action name="import-dmp-2-94">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_94.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+            <param>daycurr=${oper_yyyyMMdd}</param>
+        </hive2>
+        <ok to="import-dmp-2-105"/>
+        <error to="recover-parquet-batch" />
+    </action>
+    -->
+
+                        <!--
+                        <action name="import-dmp-2-94-end">
+                            <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                <host>dmp@DSc-diif02</host>
+                                <command>echo "end_time=`date '+%s'`"</command>
+                                <capture-output/>
+                            </ssh>
+                            <ok to="import-dmp-2-110"/>
+                            <error to="email-noti" />
+                        </action>
+                        -->
+
+    <action name="import-dmp-2-105">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_105.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+            <param>daycurr=${oper_yyyyMMdd}</param>
+        </hive2>
+        <ok to="import-dmp-2-106"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                        <!--
+                        <action name="import-dmp-2-105-end">
+                            <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                <host>dmp@DSc-diif02</host>
+                                <command>echo "end_time=`date '+%s'`"</command>
+                                <capture-output/>
+                            </ssh>
+                            <ok to="import-dmp-2-106"/>
+                            <error to="email-noti" />
+                        </action>
+                        -->
+
+    <action name="import-dmp-2-106">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_106.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+            <param>daycurr=${oper_yyyyMMdd}</param>
+        </hive2>
+        <ok to="import-dmp-2-107"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                        <!--
+                        <action name="import-dmp-2-106-end">
+                            <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                <host>dmp@DSc-diif02</host>
+                                <command>echo "end_time=`date '+%s'`"</command>
+                                <capture-output/>
+                            </ssh>
+                            <ok to="import-dmp-2-107"/>
+                            <error to="email-noti" />
+                        </action>
+                        -->
+
+    <action name="import-dmp-2-107">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_107.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+            <param>daycurr=${oper_yyyyMMdd}</param>
+        </hive2>
+        <ok to="import-dmp-2-108"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                        <!--
+                        <action name="import-dmp-2-107-end">
+                            <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                <host>dmp@DSc-diif02</host>
+                                <command>echo "end_time=`date '+%s'`"</command>
+                                <capture-output/>
+                            </ssh>
+                            <ok to="import-dmp-2-108"/>
+                            <error to="email-noti" />
+                        </action>
+                        -->
+
+    <action name="import-dmp-2-108">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_108.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+            <param>daycurr=${oper_yyyyMMdd}</param>
+        </hive2>
+        <ok to="import-dmp-2-109"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                        <!--
+                        <action name="import-dmp-2-108-end">
+                            <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                <host>dmp@DSc-diif02</host>
+                                <command>echo "end_time=`date '+%s'`"</command>
+                                <capture-output/>
+                            </ssh>
+                            <ok to="import-dmp-2-109"/>
+                            <error to="email-noti" />
+                        </action>
+                        -->
+
+    <action name="import-dmp-2-109">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_109.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+            <param>daycurr=${oper_yyyyMMdd}</param>
+        </hive2>
+        <ok to="join-all-dmp-import"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                        <!--
+                        <action name="import-dmp-2-109-end">
+                            <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                <host>dmp@DSc-diif02</host>
+                                <command>echo "end_time=`date '+%s'`"</command>
+                                <capture-output/>
+                            </ssh>
+                            <ok to="join-all-dmp-import"/>
+                            <error to="email-noti" />
+                        </action>
+                        -->
+
+    <!-- branch 2 -->
+
+                        <!--
+                        <action name="import-dmp-2-70-start">
+                            <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                <host>dmp@DSc-diif02</host>
+                                <command>echo "start_time=`date '+%s'`"</command>
+                                <capture-output/>
+                            </ssh>
+                            <ok to="import-dmp-2-70"/>
+                            <error to="email-noti" />
+                        </action>
+                        -->
+
+    <action name="import-dmp-2-70">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_70.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+            <param>daycurr=${oper_yyyyMMdd}</param>
+        </hive2>
+        <ok to="import-dmp-2-00"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                        <!--
+                        <action name="import-dmp-2-70-end">
+                            <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                <host>dmp@DSc-diif02</host>
+                                <command>echo "end_time=`date '+%s'`"</command>
+                                <capture-output/>
+                            </ssh>
+                            <ok to="import-dmp-2-00"/>
+                            <error to="email-noti" />
+                        </action>
+                        -->
+
+    <action name="import-dmp-2-00">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_audience_upload.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+            <param>daycurr=${oper_yyyyMMdd}</param>
+        </hive2>
+        <ok to="import-dmp-2-92"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                        <!--
+                        <action name="import-dmp-2-00-end">
+                            <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                <host>dmp@DSc-diif02</host>
+                                <command>echo "end_time=`date '+%s'`"</command>
+                                <capture-output/>
+                            </ssh>
+                            <ok to="import-dmp-2-92"/>
+                            <error to="email-noti" />
+                        </action>
+                        -->
+
+    <action name="import-dmp-2-92">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_92.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+            <param>daycurr=${oper_yyyyMMdd}</param>
+        </hive2>
+        <ok to="import-dmp-2-112"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                        <!--
+                        <action name="import-dmp-2-92-end">
+                            <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                <host>dmp@DSc-diif02</host>
+                                <command>echo "end_time=`date '+%s'`"</command>
+                                <capture-output/>
+                            </ssh>
+                            <ok to="import-dmp-2-93"/>
+                            <error to="email-noti" />
+                        </action>
+                        -->
+
+    <!--
+    <action name="import-dmp-2-100">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_100.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+            <param>daycurr=${oper_yyyyMMdd}</param>
+        </hive2>
+        <ok to="import-dmp-2-112"/>
+        <error to="recover-parquet-batch" />
+    </action>
+    -->
+
+    <action name="import-dmp-2-112">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_112.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day3before=${day3before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+        </hive2>
+        <ok to="join-all-dmp-import"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+    <!-- branch 3 -->
+
+
+    <action name="import-dmp-2-129">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_129.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+            <param>daycurr=${oper_yyyyMMdd}</param>
+        </hive>
+        <ok to="import-dmp-2-139"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+    <action name="import-dmp-2-139">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_139.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+            <param>daycurr=${oper_yyyyMMdd}</param>
+        </hive2>
+        <ok to="join-all-dmp-import"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+
+    <!--
+    <action name="import-dmp-2-100-end">
+        <ssh xmlns="uri:oozie:ssh-action:0.1">
+            <host>dmp@DSc-diif02</host>
+            <command>echo "end_time=`date '+%s'`"</command>
+            <capture-output/>
+        </ssh>
+        <ok to="join-all-dmp-import"/>
+        <error to="email-noti" />
+    </action>
+    -->
+
+    <!-- branch 4 -->
+
+    <action name="import-dmp-2-130">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_130.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-131"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+    <action name="import-dmp-2-131">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_131.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-132"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+    <action name="import-dmp-2-132">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_132.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-133"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+    <action name="import-dmp-2-133">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_133.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-134"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+    <action name="import-dmp-2-134">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_134.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-135"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+    <action name="import-dmp-2-135">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_135.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-136"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+    <action name="import-dmp-2-136">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_136.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-140"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+    <action name="import-dmp-2-140">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_140.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-141"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+    <action name="import-dmp-2-141">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_141.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+        </hive2>
+        <ok to="import-dmp-2-143"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+    <action name="import-dmp-2-143">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_143.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day90before=${day90before}</param>
+            <param>day91before=${day91before}</param>
+        </hive2>
+        <ok to="join-all-dmp-import"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+    <join name="join-all-dmp-import" to="import-dmp-2-90"/><!--<join name="join-all-dmp-import" to="join-all-end"/>-->
+
+                        <!--
+                        <action name="join-all-end">
+                            <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                <host>dmp@DSc-diif02</host>
+                                <command>echo "end_time=`date '+%s'`"</command>
+                                <capture-output/>
+                            </ssh>
+                            <ok to="import-dmp-2-90"/>
+                            <error to="email-noti" />
+                        </action>
+                        -->
+
+    <action name="import-dmp-2-90">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/import_dmp_new_storage_90.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+            <param>day91before=${day91before}</param>
+            <param>daycurr=${oper_yyyyMMdd}</param>
+        </hive2>
+        <ok to="remove-demo-previous"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                        <!--
+                        <action name="import-dmp-2-90-end">
+                            <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                <host>dmp@DSc-diif02</host>
+                                <command>echo "end_time=`date '+%s'`"</command>
+                                <capture-output/>
+                            </ssh>
+                            <ok to="dmp-timing-log-branch"/>
+                            <error to="email-noti" />
+                        </action>
+                        -->
+
+    <action name="remove-demo-previous">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/remove_demo_prev.hql</script>
+            <param>daycurr=${oper_yyyyMMdd}</param>
+        </hive2>
+        <ok to="fs-success-dl-1"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="fs-success-dl-1" retry-max="2" retry-interval="5">
+        <fs>
+            <touchz path="hdfs://skpds/user/hive/warehouse/dmp.db/prod_data_source_store/part_hour=${day2before}00/_SUCCESS_DAILY_D2" />
+        </fs>
+        <ok to="fs-success-dl-2" />
+        <error to="email-noti" />
+    </action>
+
+    <action name="fs-success-dl-2" retry-max="2" retry-interval="5">
+        <fs>
+            <touchz path="hdfs://skpds/user/hive/warehouse/dmp.db/prod_data_source_store/part_hour=${oper_yyyyMMdd}00/_SUCCESS_DAILY_D0" />
+        </fs>
+        <ok to="fs-success-dl-3" />
+        <error to="email-noti" />
+    </action>
+
+    <action name="fs-success-dl-3" retry-max="2" retry-interval="5">
+        <fs>
+            <touchz path="hdfs://skpds/user/hive/warehouse/dmp.db/prod_data_source_store_parquet/part_hour=${day2before}00/_SUCCESS_DAILY_D2" />
+        </fs>
+        <ok to="fs-success-dl-4" />
+        <error to="email-noti" />
+    </action>
+
+    <action name="fs-success-dl-4" retry-max="2" retry-interval="5">
+        <fs>
+            <touchz path="hdfs://skpds/user/hive/warehouse/dmp.db/prod_data_source_store_parquet/part_hour=${oper_yyyyMMdd}00/_SUCCESS_DAILY_D0" />
+        </fs>
+        <ok to="dmp-timing-log-branch" />
+        <error to="email-noti" />
+    </action>
+
+    <action name="dmp-timing-log-branch">
+        <ssh xmlns="uri:oozie:ssh-action:0.1">
+            <host>dmp@DSc-diif02</host>
+            <command>/app/home/dmp/dmp/jobs/wf_dmp_import_data/impala/parquet_prepare_dl.sh</command>
+        </ssh>
+        <ok to="end"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="dmp-timing-log-branch-bak">
+        <ssh xmlns="uri:oozie:ssh-action:0.1">
+            <host>dmp@DSc-diif02</host>
+            <command>/app/home/dmp/dmp/jobs/wf_dmp_import_data/impala/parquet_prepare_dl.sh &amp;&amp;
+                /app/home/dmp/dmp/dsp_categ_db/dmp_timing_meta.sh  62 ${wf:actionData('import-dmp-2-62-start')['start_time']} ${wf:actionData('import-dmp-2-62-end')['end_time']} &amp;&amp;
+                /app/home/dmp/dmp/dsp_categ_db/dmp_timing_meta.sh  69 ${wf:actionData('import-dmp-2-62-end')['end_time']} ${wf:actionData('import-dmp-2-69-end')['end_time']} &amp;&amp;
+                /app/home/dmp/dmp/dsp_categ_db/dmp_timing_meta.sh  91 ${wf:actionData('import-dmp-2-69-end')['end_time']} ${wf:actionData('import-dmp-2-91-end')['end_time']} &amp;&amp;
+                /app/home/dmp/dmp/dsp_categ_db/dmp_timing_meta.sh  85 ${wf:actionData('import-dmp-2-91-end')['end_time']} ${wf:actionData('import-dmp-2-85-end')['end_time']} &amp;&amp;
+                /app/home/dmp/dmp/dsp_categ_db/dmp_timing_meta.sh  94 ${wf:actionData('import-dmp-2-85-end')['end_time']} ${wf:actionData('import-dmp-2-94-end')['end_time']} &amp;&amp;
+                /app/home/dmp/dmp/dsp_categ_db/dmp_timing_meta.sh 110 ${wf:actionData('import-dmp-2-94-end')['end_time']} ${wf:actionData('import-dmp-2-110-end')['end_time']} &amp;&amp;
+                /app/home/dmp/dmp/dsp_categ_db/dmp_timing_meta.sh 111 ${wf:actionData('import-dmp-2-110-end')['end_time']} ${wf:actionData('import-dmp-2-111-end')['end_time']} &amp;&amp;
+                /app/home/dmp/dmp/dsp_categ_db/dmp_timing_meta.sh 105 ${wf:actionData('import-dmp-2-111-end')['end_time']} ${wf:actionData('import-dmp-2-105-end')['end_time']} &amp;&amp;
+                /app/home/dmp/dmp/dsp_categ_db/dmp_timing_meta.sh 106 ${wf:actionData('import-dmp-2-105-end')['end_time']} ${wf:actionData('import-dmp-2-106-end')['end_time']} &amp;&amp;
+                /app/home/dmp/dmp/dsp_categ_db/dmp_timing_meta.sh 107 ${wf:actionData('import-dmp-2-106-end')['end_time']} ${wf:actionData('import-dmp-2-107-end')['end_time']} &amp;&amp;
+                /app/home/dmp/dmp/dsp_categ_db/dmp_timing_meta.sh 108 ${wf:actionData('import-dmp-2-107-end')['end_time']} ${wf:actionData('import-dmp-2-108-end')['end_time']} &amp;&amp;
+                /app/home/dmp/dmp/dsp_categ_db/dmp_timing_meta.sh 109 ${wf:actionData('import-dmp-2-108-end')['end_time']} ${wf:actionData('import-dmp-2-109-end')['end_time']} &amp;&amp;
+                /app/home/dmp/dmp/dsp_categ_db/dmp_timing_meta.sh  70 ${wf:actionData('import-dmp-2-70-start')['start_time']} ${wf:actionData('import-dmp-2-70-end')['end_time']} &amp;&amp;
+                /app/home/dmp/dmp/dsp_categ_db/dmp_timing_meta.sh   0 ${wf:actionData('import-dmp-2-70-end')['end_time']} ${wf:actionData('import-dmp-2-00-end')['end_time']} &amp;&amp;
+                /app/home/dmp/dmp/dsp_categ_db/dmp_timing_meta.sh  92 ${wf:actionData('import-dmp-2-00-end')['end_time']} ${wf:actionData('import-dmp-2-92-end')['end_time']} &amp;&amp;
+                /app/home/dmp/dmp/dsp_categ_db/dmp_timing_meta.sh  93 ${wf:actionData('import-dmp-2-92-end')['end_time']} ${wf:actionData('import-dmp-2-93-end')['end_time']} &amp;&amp;
+                /app/home/dmp/dmp/dsp_categ_db/dmp_timing_meta.sh 100 ${wf:actionData('import-dmp-2-93-end')['end_time']} ${wf:actionData('import-dmp-2-100-end')['end_time']} &amp;&amp;
+                /app/home/dmp/dmp/dsp_categ_db/dmp_timing_meta.sh  90 ${wf:actionData('join-all-end')['end_time']}        ${wf:actionData('import-dmp-2-90-end')['end_time']} &amp;&amp;
+                /app/home/dmp/dmp/dsp_categ_db/dmp_timing_dbload.sh
+            </command>
+        </ssh>
+        <ok to="end"/>
+        <error to="email-noti" />
+    </action>
+
+
+
+
+    <action name="recover-parquet-batch">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/dmp_new_import_per_datasource/recover_parquet.hql</script>
+            <param>daycurr=${oper_yyyyMMdd}</param>
+            <param>daybefore=${daybefore}</param>
+        </hive2>
+        <ok to="email-noti"/>
+        <error to="email-noti" />
+    </action>
+
+
+
+
+    <action name="import_syrupad_retargeting">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/syrupad_retargeting/import_syrupad_retargeting.hql</script>
+            <param>db=${hiveDatabase}</param>
+            <param>dmp_site_id=${dmp_site_id}</param>
+            <param>dmp_data_source_id=${dmp_data_source_id}</param>
+            <param>from_dt=${from_yyyyMMddHH}</param>
+            <param>to_dt=${to_yyyyMMddHH}</param>
+        </hive2>
+        <ok to="end"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="import_recopick">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/recopick/import_recopick.hql</script>
+            <param>PART_DATE_1=${partDate1}</param>
+            <param>PART_DATE=${partDate}</param>
+        </hive2>
+        <ok to="end"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="import_oksusu">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/oksusu/import_oksusu.hql</script>
+            <param>PART_DATE_1=${partDate1}</param>
+            <param>PART_DATE=${partDate}</param>
+        </hive2>
+        <ok to="end"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="import_syrupad_pbp">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${workflowAppUri}/syrupad_pbp/import_syrupad_pbp.hql</script>
+            <param>db=${hiveDatabase}</param>
+            <param>dmp_site_id=${dmp_site_id}</param>
+            <param>dmp_data_source_id=${dmp_data_source_id}</param>
+            <param>from_ts=${from_ts}</param>
+            <param>to_ts=${to_ts}</param>
+            <param>from_dt=${from_dt}</param>
+            <param>to_dt=${to_dt}</param>
+        </hive2>
+        <ok to="end"/>
+        <error to="email-noti" />
+    </action>
+
+
+    <!--
+    <fork name="fork-test">
+        <path start="test-export"/>
+    </fork>
+    -->
+
+    <!--
+    <join name="join-stat" to="test-delete"/>
+    -->
+
+    <action name="email-noti">
+        <email xmlns="uri:oozie:email-action:0.1">
+            <to>${emailNotiTo}</to>
+            <subject>[WF@${nameNode}]${(empty wf:lastErrorNode() )? 'SUCCESS' :	'FAILURE'} : ${wf:name()}(${wf:id()}, ${oper_yyyyMMdd})</subject>
+            <body>
+                <![CDATA[[${wf:name()}(${wf:id()})] in [${wf:appPath()}] at [${timestamp()}]<br>${(empty wf:lastErrorNode()) ? 'Workflow succeeded.' : 'Action failed.'}<br>${(empty wf:lastErrorNode()) ? '' : concat(concat(wf:lastErrorNode(), ' => '), wf:errorMessage(wf:lastErrorNode()))}<br>]]>
+            </body>
+        </email>
+        <ok to="kill" />
+        <error to="kill" />
+    </action>
+
+    <kill name="kill">
+        <message>Action failed, error message[${wf:errorMessage(wf:lastErrorNode())}]</message>
+    </kill>
+    <end name="end"/>
+</workflow-app>

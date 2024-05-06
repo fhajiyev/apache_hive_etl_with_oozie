@@ -1,0 +1,20 @@
+
+USE SVC_CSW1;
+
+
+INSERT OVERWRITE TABLE DMP_POC_CODE
+SELECT
+ CASE WHEN REGEXP_REPLACE(ENT, ',', ' ') = 'null'                     THEN '' ELSE REGEXP_REPLACE(ENT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(ATT, ',', ' ') = 'null'                     THEN '' ELSE REGEXP_REPLACE(ATT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(BIT_ATT, ',', ' ') = 'null'                 THEN '' ELSE REGEXP_REPLACE(BIT_ATT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(NAME, ',', ' ') = 'null'                    THEN '' ELSE REGEXP_REPLACE(NAME, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(ENGLISH_NAME, ',', ' ') = 'null'            THEN '' ELSE REGEXP_REPLACE(ENGLISH_NAME, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(VALUE1, ',', ' ') = 'null'                  THEN '' ELSE REGEXP_REPLACE(VALUE1, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(VALUE2, ',', ' ') = 'null'                  THEN '' ELSE REGEXP_REPLACE(VALUE2, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(SORT_ORD, ',', ' ') = 'null'                THEN '' ELSE REGEXP_REPLACE(SORT_ORD, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(STATUS_GB, ',', ' ') = 'null'               THEN '' ELSE REGEXP_REPLACE(STATUS_GB, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(API_FL, ',', ' ') = 'null'                  THEN '' ELSE REGEXP_REPLACE(API_FL, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(COMMENT, ',', ' ') = 'null'                 THEN '' ELSE REGEXP_REPLACE(COMMENT, ',', ' ') END
+
+FROM TEMP_DMP_POC_CODE
+;

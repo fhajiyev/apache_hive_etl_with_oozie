@@ -1,0 +1,22 @@
+
+USE SVC_CSW1;
+
+INSERT OVERWRITE TABLE DMP_POC_DMP_CLUSTER
+SELECT
+ CASE WHEN REGEXP_REPLACE(CLUSTER_SQ, ',', ' ') = 'null'                            THEN '' ELSE REGEXP_REPLACE(CLUSTER_SQ, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(STATUS_CD, ',', ' ') = 'null'                             THEN '' ELSE REGEXP_REPLACE(STATUS_CD, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(CLUSTER_NM, ',', ' ') = 'null'                            THEN '' ELSE REGEXP_REPLACE(CLUSTER_NM, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(CLUSTER_TYPE_CD, ',', ' ') = 'null'                       THEN '' ELSE REGEXP_REPLACE(CLUSTER_TYPE_CD, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(MAIN_CATEGORY_SQ, ',', ' ') = 'null'                      THEN '' ELSE REGEXP_REPLACE(MAIN_CATEGORY_SQ, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(SUB_CATEGORY_SQ, ',', ' ') = 'null'                       THEN '' ELSE REGEXP_REPLACE(SUB_CATEGORY_SQ, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(KRUX_SEG_NM, ',', ' ') = 'null'                           THEN '' ELSE REGEXP_REPLACE(KRUX_SEG_NM, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(KRUX_SEG_ID, ',', ' ') = 'null'                           THEN '' ELSE REGEXP_REPLACE(KRUX_SEG_ID, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(KRUX_SEG_ID_LONG, ',', ' ') = 'null'                      THEN '' ELSE REGEXP_REPLACE(KRUX_SEG_ID_LONG, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(MEMO, ',', ' ') = 'null'                                  THEN '' ELSE REGEXP_REPLACE(MEMO, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(CREATE_DT, ',', ' ') = 'null'                             THEN '' ELSE REGEXP_REPLACE(CREATE_DT, ',', ' ') END
+
+FROM TEMP_DMP_POC_DMP_CLUSTER
+WHERE STATUS_CD != 'CLSSTT199'
+AND
+cast(CLUSTER_SQ as bigint) IS NOT NULL
+;

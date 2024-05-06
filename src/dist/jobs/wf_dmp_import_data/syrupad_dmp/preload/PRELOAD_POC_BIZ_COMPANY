@@ -1,0 +1,38 @@
+
+
+use SVC_CSW1;
+
+set hivevar:MetaPathHive;
+
+DROP TABLE IF EXISTS TEMP_DMP_POC_BIZ_COMPANY;
+
+CREATE TABLE TEMP_DMP_POC_BIZ_COMPANY
+(
+
+      BIZ_COMPANY_SQ       STRING,
+      COMPANY_TYPE_CD      STRING,
+      COMPANY_STATUS_CD    STRING,
+      COMPANY_NM           STRING,
+      CEO_NM               STRING,
+      BIZ_NO               STRING,
+      ZIP_NO               STRING,
+      MAIN_ADDRESS_NM      STRING,
+      SUB_ADDRESS_NM       STRING,
+      REP_AGY_FEE_AMT      STRING,
+      ADV_GRADE_CD         STRING,
+      MAIN_CATEGORY_CD     STRING,
+      SUB_CATEGORY_CD      STRING,
+      BIZ_MAIN_CATEGORY_NM STRING,
+      BIZ_SUB_CATEGORY_NM  STRING,
+      SITE_CD              STRING,
+      PARENT_ACCOUNT_SQ    STRING,
+      CREATE_DT            STRING,
+      UPDATE_DT            STRING,
+      CREATE_ACCOUNT_SQ    STRING,
+      UPDATE_ACCOUNT_SQ    STRING
+
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '|';
+
+
+LOAD DATA INPATH '${hivevar:MetaPathHive}/poc_biz_company/part-m-00000' INTO TABLE TEMP_DMP_POC_BIZ_COMPANY;

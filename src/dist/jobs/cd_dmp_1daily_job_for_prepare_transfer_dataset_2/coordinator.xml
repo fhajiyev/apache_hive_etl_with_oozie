@@ -1,0 +1,37 @@
+<coordinator-app name="cd_dmp_${oozie_job_name}" frequency="${run_minute} ${run_hour} * * ${run_dayofweek}" start="${start}" end="${end}" timezone="${timezone}" xmlns="uri:oozie:coordinator:0.2">
+
+    <action>
+        <workflow>
+            <app-path>${workflowAppUri}</app-path>
+            <configuration>
+
+                <property>
+                    <name>oper_yyyyMMdd</name>
+                    <value>${coord:formatTime(coord:actualTime(), 'yyyyMMdd')}</value>
+                </property>
+
+                <property>
+                    <name>oper_yyyyMMddHHmm</name>
+                    <value>${coord:formatTime(coord:actualTime(), 'yyyyMMddHHmm')}</value>
+                </property>
+
+                <property>
+                    <name>from_dt_yyyyMMdd</name>
+                    <value>${coord:formatTime(coord:dateOffset(coord:nominalTime(), -91, 'DAY'), 'yyyyMMdd')}</value>
+                </property>
+
+                <property>
+                    <name>to_dt_yyyyMMdd</name>
+                    <value>${coord:formatTime(coord:dateOffset(coord:nominalTime(),  -1, 'DAY'), 'yyyyMMdd')}</value>
+                </property>
+
+                <property>
+                    <name>day2before</name>
+                    <value>${coord:formatTime(coord:dateOffset(coord:nominalTime(),  -2, 'DAY'), 'yyyyMMdd')}</value>
+                </property>
+
+            </configuration>
+        </workflow>
+    </action>
+
+</coordinator-app>

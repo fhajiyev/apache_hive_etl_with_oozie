@@ -1,0 +1,874 @@
+<workflow-app name="wf_dmp_recommend" xmlns="uri:oozie:workflow:0.4">
+    <start to="select_job"/>
+
+    <decision name="select_job">
+        <switch>
+            <case to="syrupad_retargeting_get_job_parameter">
+                ${(oozie_job_name == "2hourly_job_for_syrupad_retargeting")}
+            </case>
+            <case to="get-dmp-parameters-from-db">
+                ${(oozie_job_name == "2hourly_job_for_syrupad_pbp")}
+            </case>
+            <case to="end">
+                ${(oozie_job_name != "1daily_job_for_syrupad_retargeting")}
+            </case>
+            <default to="end"/>
+        </switch>
+    </decision>
+
+    <action name="syrupad_retargeting_get_job_parameter">
+        <java>
+            <job-tracker>${jobTracker4DBif}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename </name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+
+            <main-class>com.skplanet.dmp.oozie.MySqlAction</main-class>
+            <arg>${mysqlConnection}</arg>
+            <arg>${mysqlUser}</arg>
+            <arg>${mysqlPassword}</arg>
+            <arg>
+                SELECT  MAX(CASE WHEN param_name = 'mapreduce.job.reduces' THEN param_value ELSE null END) AS "mapreduce.job.reduces",
+                        MAX(CASE WHEN param_name = '--similarityClassname' THEN param_value ELSE null END) AS "--similarityClassname",
+                        MAX(CASE WHEN param_name = '--numRecommendations' THEN param_value ELSE null END) AS "--numRecommendations",
+                        DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -1*MAX(CASE WHEN param_name = 'window_size' THEN CAST(param_value AS DECIMAL) ELSE 1 END)  DAY), '%Y%m%d') AS "from_dt",
+                        DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -1*MAX(CASE WHEN param_name = 'window_size' THEN CAST(param_value AS DECIMAL) ELSE 1 END)  DAY), '%Y%m%d%H') AS "from_ts",
+                        MAX(CASE WHEN param_name = 'preference' THEN param_value ELSE null END) AS "preference"
+                  FROM  dmp_job_parameter
+                 WHERE  dmp_job_id = ${dmp_job_id}
+            </arg>
+            <capture-output/>
+        </java>
+        <ok to="syrupad_retargeting_1step_01"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="syrupad_retargeting_1step_01">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename </name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>syrupad_retargeting/1step/01_create_external_table.hql</script>
+            <param>oozie_job_name=${oozie_job_name}</param>
+            <param>dmp_site_id=${dmp_site_id}</param>
+            <param>dmp_data_source_id=${dmp_data_source_id}</param>
+            <param>retargeting_hdfs_home=${retargeting_hdfs_home}</param>
+            <param>preference=${wf:actionData('syrupad_retargeting_get_job_parameter')['preference']}</param>
+            <param>term=${term}</param>
+
+            <!--
+            <param>from_dt=${wf:actionData('syrupad_retargeting_get_job_parameter')['from_dt']}</param>
+            <param>to_dt=${to_yyyyMMdd}</param>
+            <param>from_ts=${wf:actionData('syrupad_retargeting_get_job_parameter')['from_ts']}</param>
+            <param>to_ts=${to_yyyyMMddHH}</param>
+            -->
+
+        </hive>
+        <ok to="fork_syrupad_retargeting_2step"/>
+        <error to="email-noti" />
+    </action>
+
+    <fork name="fork_syrupad_retargeting_2step">
+        <path start="syrupad_retargeting_2step_01_01"/>
+        <path start="syrupad_retargeting_2step_01_02"/>
+    </fork>
+
+    <action name="syrupad_retargeting_2step_01_01">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename </name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>syrupad_retargeting/2step/01_01_mahout_prod_no_prod_sq_mapping.hql</script>
+            <param>oozie_job_name=${oozie_job_name}</param>
+            <param>libDir=${libDir}</param>
+        </hive>
+        <ok to="join_syrupad_retargeting_2step"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="syrupad_retargeting_2step_01_02">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename </name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>syrupad_retargeting/2step/01_02_mahout_uuid_uuid_sq_mapping.hql</script>
+            <param>oozie_job_name=${oozie_job_name}</param>
+            <param>libDir=${libDir}</param>
+        </hive>
+        <ok to="syrupad_retargeting_2step_02"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="syrupad_retargeting_2step_02">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename </name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>syrupad_retargeting/2step/02_process_mahout_users.hql</script>
+            <param>oozie_job_name=${oozie_job_name}</param>
+        </hive>
+        <ok to="join_syrupad_retargeting_2step"/>
+        <error to="email-noti" />
+    </action>
+
+    <join name="join_syrupad_retargeting_2step" to="fork_syrupad_retargeting_3step"/>
+
+    <fork name="fork_syrupad_retargeting_3step">
+        <path start="syrupad_retargeting_3step_01_01"/>
+        <path start="syrupad_retargeting_3step_01_02"/>
+    </fork>
+
+    <action name="syrupad_retargeting_3step_01_01">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename </name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>syrupad_retargeting/3step/01_01_process_tmp_recommend.hql</script>
+            <param>oozie_job_name=${oozie_job_name}</param>
+            <param>libDir=${libDir}</param>
+            <param>jobId=${jobId}</param>
+        </hive>
+        <ok to="join_syrupad_retargeting_3step"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="syrupad_retargeting_3step_01_02">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename </name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>syrupad_retargeting/3step/01_02_process_mahout_input.hql</script>
+            <param>oozie_job_name=${oozie_job_name}</param>
+        </hive>
+        <ok to="syrupad_retargeting_run_mahout"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="syrupad_retargeting_run_mahout">
+        <java>
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+
+            <prepare>
+                <delete path="${retargeting_hdfs_home}/${oozie_job_name}/temp"/>
+                <delete path="${retargeting_hdfs_home}/${oozie_job_name}/mahout_output"/>
+            </prepare>
+
+            <configuration>
+                <property>
+                    <name>mapreduce.input.fileinputformat.split.maxsize</name>
+                    <value>8388608</value>
+                </property>
+                <property>
+                    <name>mapreduce.job.reduces</name>
+                    <value>${wf:actionData('syrupad_retargeting_get_job_parameter')['mapreduce.job.reduces']}</value>
+                </property>
+                <property>
+                    <name>mapreduce.map.output.compress</name>
+                    <value>false</value>
+                </property>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+
+            <main-class>org.apache.mahout.cf.taste.hadoop.item.RecommenderJob</main-class>
+
+            <arg>--input</arg>
+            <arg>${retargeting_hdfs_home}/${oozie_job_name}/mahout_input</arg>
+            <arg>--output</arg>
+            <arg>${retargeting_hdfs_home}/${oozie_job_name}/mahout_output</arg>
+            <arg>--tempDir</arg>
+            <arg>${retargeting_hdfs_home}/${oozie_job_name}/temp</arg>
+            <arg>--usersFile</arg>
+            <arg>${retargeting_hdfs_home}/${oozie_job_name}/mahout_users/000000_0</arg>
+
+            <arg>--booleanData</arg>
+            <arg>--similarityClassname</arg>
+            <arg>${wf:actionData('syrupad_retargeting_get_job_parameter')['--similarityClassname']}</arg>
+            <arg>--numRecommendations</arg>
+            <arg>${wf:actionData('syrupad_retargeting_get_job_parameter')['--numRecommendations']}</arg>
+        </java>
+        <ok to="join_syrupad_retargeting_3step"/>
+        <error to="email-noti" />
+    </action>
+
+    <join name="join_syrupad_retargeting_3step" to="syrupad_retargeting_4step_01"/>
+
+    <action name="syrupad_retargeting_4step_01">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename </name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>syrupad_retargeting/4step/01_tmp_recommend.hql</script>
+            <param>oozie_job_name=${oozie_job_name}</param>
+            <param>jobId=${jobId}</param>
+        </hive>
+        <ok to="syrupad_retargeting_4step_02"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="syrupad_retargeting_4step_02">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename </name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>syrupad_retargeting/4step/02_svc_recommend.hql</script>
+            <param>oozie_job_name=${oozie_job_name}</param>
+        </hive>
+        <ok to="syrupad_retargeting_5step_for_impala"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="syrupad_retargeting_5step_for_impala">
+        <ssh xmlns="uri:oozie:ssh-action:0.1">
+            <host>dmp@DSc-diif02</host>
+            <command>${retargeting_ssh_action_home}/5step_for_impala/01_svc_recommend_for_impala.sh</command>
+            <args>${oozie_job_name}</args>
+            <capture-output/>
+        </ssh>
+        <ok to="end"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="email-noti">
+        <email xmlns="uri:oozie:email-action:0.1">
+            <to>${emailNotiTo}</to>
+            <subject>[WF@${nameNode}]${(empty wf:lastErrorNode() )? 'SUCCESS' :	'FAILURE'} : ${wf:name()}(${wf:id()}, ${oper_yyyyMMdd})</subject>
+            <body>
+                <![CDATA[[${wf:name()}(${wf:id()})] in [${wf:appPath()}] at [${timestamp()}]<br>${(empty wf:lastErrorNode()) ? 'Workflow succeeded.' : 'Action failed.'}<br>${(empty wf:lastErrorNode()) ? '' : concat(concat(wf:lastErrorNode(), ' => '), wf:errorMessage(wf:lastErrorNode()))}<br>]]>
+            </body>
+        </email>
+        <ok to="kill" />
+        <error to="kill" />
+    </action>
+
+
+    <!--
+    SYRUPAD_PBP WORKFLOW STARTS HERE
+    -->
+    <action name="get-dmp-parameters-from-db">
+        <java>
+            <job-tracker>${jobTracker4DBif}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+
+            <main-class>com.skplanet.dmp.oozie.MySqlAction</main-class>
+            <arg>${mysqlConnection}</arg>
+            <arg>${mysqlUser}</arg>
+            <arg>${mysqlPassword}</arg>
+            <arg>select max(case when param_name = 'term_high'               then param_value else null end) as "term_high",
+                         max(case when param_name = 'from_dt_high'            then param_value else null end) as "from_dt_high",
+                         max(case when param_name = 'to_dt_high'              then param_value else null end) as "to_dt_high",
+                         max(case when param_name = 'from_ts_high'            then param_value else null end) as "from_ts_high",
+                         max(case when param_name = 'to_ts_high'              then param_value else null end) as "to_ts_high",
+                         max(case when param_name = 'start_high'              then param_value else null end) as "start_high",
+                         max(case when param_name = 'reset_high'              then param_value else null end) as "reset_high",
+                         max(case when param_name = 'recomm_engine_high'      then param_value else null end) as "recomm_engine_high",
+                         max(case when param_name = 'mahout_num_recomm_high'  then param_value else null end) as "mahout_num_recomm_high",
+                         max(case when param_name = 'mahout_max_cooccur_high' then param_value else null end) as "mahout_max_cooccur_high",
+                         max(case when param_name = 'mahout_similar_high'     then param_value else null end) as "mahout_similar_high",
+                         max(case when param_name = 'filter_high'             then param_value else null end) as "filter_high"
+                         max(case when param_name = 'preference_pbp_high'     then param_value else null end) as "preference_pbp_high"
+                from tad3.dmp_job_parameter
+                where dmp_job_id = ${dmp_job_id}
+            </arg>
+            <capture-output/>
+        </java>
+        <ok to="decision-recomm-engine"/>
+        <error to="email-noti" />
+    </action>
+
+    <decision name="decision-recomm-engine">
+        <switch>
+
+            <case to="create-external-table-mahout-itembased">
+                ${ wf:actionData('get-dmp-parameters-from-db')['recomm_engine_high'] eq 'MAHOUT_ITEMBASED' }
+            </case>
+
+            <case to="create-external-table-mahout-als">
+                ${ wf:actionData('get-dmp-parameters-from-db')['recomm_engine_high'] eq 'MAHOUT_ALS'       }
+            </case>
+
+            <case to="create-external-table-spark-als">
+                ${ wf:actionData('get-dmp-parameters-from-db')['recomm_engine_high'] eq 'SPARK_ALS'        }
+            </case>
+
+            <default to="end"/>
+
+        </switch>
+    </decision>
+
+    <action name="impala-step-1">
+        <ssh xmlns="uri:oozie:ssh-action:0.1">
+            <host>dmp@DSc-diif02</host>
+            <command>${syrupad_pbp_ssh_action_home}/5step_for_impala/01_svc_syrupad_recommend_for_impala.sh</command>
+            <args>${oozie_job_name}</args>
+            <capture-output/>
+        </ssh>
+        <ok to="impala-step-2"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="impala-step-2">
+        <ssh xmlns="uri:oozie:ssh-action:0.1">
+            <host>dmp@DSc-diif02</host>
+            <command>${syrupad_pbp_ssh_action_home}/5step_for_impala/02_view_for_impala.sh</command>
+            <args>${oozie_job_name}</args>
+            <capture-output/>
+        </ssh>
+        <ok to="end"/>
+        <error to="email-noti" />
+    </action>
+
+
+
+    <action name="create-external-table-mahout-itembased">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+
+            </configuration>
+
+            <script>syrupad_pbp/1step/01_create_external_table_mahout_itembased.hql</script>
+
+            <param>term=${term}</param>
+            <param>preference=${wf:actionData('get-dmp-parameters-from-db')['preference_pbp_high']}</param>
+            <param>dmp_site_id=${dmp_site_id}</param>
+            <param>dmp_data_source_id=${dmp_data_source_id}</param>
+            <param>syrupad_pbp_hdfs_home=${syrupad_pbp_hdfs_home}</param>
+            <param>oozie_job_name=${oozie_job_name}</param>
+
+
+        </hive>
+        <ok to="mahout-duid-duid-sq-mapping"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="create-external-table-mahout-als">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+
+            <script>syrupad_pbp/1step/01_create_external_table_mahout_als.hql</script>
+
+            <param>term=${term}</param>
+            <param>preference=${wf:actionData('get-dmp-parameters-from-db')['preference_pbp_high']}</param>
+            <param>dmp_site_id=${dmp_site_id}</param>
+            <param>dmp_data_source_id=${dmp_data_source_id}</param>
+            <param>syrupad_pbp_hdfs_home=${syrupad_pbp_hdfs_home}</param>
+            <param>oozie_job_name=${oozie_job_name}</param>
+
+
+        </hive>
+        <ok to="mahout-duid-duid-sq-mapping"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="create-external-table-spark-als">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+
+            </configuration>
+
+            <script>syrupad_pbp/1step/01_create_external_table_spark_als.hql</script>
+
+            <param>term=${term}</param>
+            <param>preference=${wf:actionData('get-dmp-parameters-from-db')['preference_pbp_high']}</param>
+            <param>dmp_site_id=${dmp_site_id}</param>
+            <param>dmp_data_source_id=${dmp_data_source_id}</param>
+            <param>syrupad_pbp_hdfs_home=${syrupad_pbp_hdfs_home}</param>
+            <param>oozie_job_name=${oozie_job_name}</param>
+
+
+        </hive>
+        <ok to="mahout-duid-duid-sq-mapping"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="mahout-duid-duid-sq-mapping">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+
+            </configuration>
+
+            <script>syrupad_pbp/2step/01_mahout_duid_duid_sq_mapping.hql</script>
+            <param>oozie_job_name=${oozie_job_name}</param>
+
+        </hive>
+        <ok to="process-mahout-syrupad-users"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="process-mahout-syrupad-users">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+
+            </configuration>
+
+            <script>syrupad_pbp/2step/02_process_mahout_syrupad_users.hql</script>
+            <param>oozie_job_name=${oozie_job_name}</param>
+
+        </hive>
+        <ok to="slot-ad"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="slot-ad">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+
+            </configuration>
+
+            <script>syrupad_pbp/2step/03_slot_ad.hql</script>
+            <param>oozie_job_name=${oozie_job_name}</param>
+
+        </hive>
+        <ok to="process-mahout-syrupad-input"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="process-mahout-syrupad-input">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+
+            </configuration>
+
+            <script>syrupad_pbp/3step/01_process_mahout_syrupad_input.hql</script>
+            <param>oozie_job_name=${oozie_job_name}</param>
+
+        </hive>
+        <ok to="decision-recomm-engine-launch"/>
+        <error to="email-noti" />
+    </action>
+
+    <decision name="decision-recomm-engine-launch">
+        <switch>
+
+            <case to="mahout-itembased-recomm">
+                ${ wf:actionData('get-dmp-parameters-from-db')['recomm_engine_high'] eq 'MAHOUT_ITEMBASED'  }
+            </case>
+
+            <case to="spark-als-recomm">
+                ${ wf:actionData('get-dmp-parameters-from-db')['recomm_engine_high'] eq 'SPARK_ALS'         }
+            </case>
+
+            <case to="mahout-als-recomm">
+                ${ wf:actionData('get-dmp-parameters-from-db')['recomm_engine_high'] eq 'MAHOUT_ALS'        }
+            </case>
+
+            <default to="end"/>
+
+        </switch>
+    </decision>
+
+    <action name="mahout-itembased-recomm">
+        <java>
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+
+
+            <prepare>
+                <delete path="${mahout_temp}"/>
+                <delete path="${mahout_output}"/>
+            </prepare>
+
+
+            <configuration>
+                <property>
+                    <name>mapreduce.input.fileinputformat.split.maxsize</name>
+                    <value>8388608</value>
+                </property>
+                <property>
+                    <name>mapreduce.job.reduces</name>
+                    <value>64</value>
+                </property>
+                <property>
+                    <name>mapreduce.map.output.compress</name>
+                    <value>false</value>
+                </property>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+
+            <main-class>org.apache.mahout.cf.taste.hadoop.item.RecommenderJob</main-class>
+
+            <arg>--input</arg>
+            <arg>${mahout_input}</arg>
+
+            <arg>--output</arg>
+            <arg>${mahout_output}</arg>
+
+            <arg>--tempDir</arg>
+            <arg>${mahout_temp}</arg>
+
+            <arg>--usersFile</arg>
+            <arg>${mahout_users}</arg>
+
+            <arg>--booleanData</arg>
+
+            <arg>--similarityClassname</arg>
+            <arg>${ wf:actionData('get-dmp-parameters-from-db')['mahout_similar_high'] }</arg>
+
+            <arg>--numRecommendations</arg>
+            <arg>${ wf:actionData('get-dmp-parameters-from-db')['mahout_num_recomm_high'] }</arg>
+
+        </java>
+        <ok to="tmp-syrupad-recommend-mahout"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="mahout-als-recomm">
+        <java>
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+
+
+            <prepare>
+                <delete path="${mahout_temp}"/>
+                <delete path="${mahout_output}"/>
+            </prepare>
+
+
+            <configuration>
+                <property>
+                    <name>mapreduce.input.fileinputformat.split.maxsize</name>
+                    <value>8388608</value>
+                </property>
+                <property>
+                    <name>mapreduce.job.reduces</name>
+                    <value>64</value>
+                </property>
+                <property>
+                    <name>mapreduce.map.output.compress</name>
+                    <value>false</value>
+                </property>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+
+            <main-class>com.skplanet.dmp.recommend.als.AlsJobSyrupAd</main-class>
+
+            <arg>--tempDir</arg>
+            <arg>${mahout_temp}</arg>
+
+            <arg>--input</arg>
+            <arg>${mahout_input}</arg>
+
+            <arg>--output</arg>
+            <arg>${mahout_output}</arg>
+
+            <arg>--lambda</arg>
+            <arg>${mahout_lambda}</arg>
+
+            <arg>--alpha</arg>
+            <arg>${mahout_alpha}</arg>
+
+            <arg>--implicitFeedback</arg>
+            <arg>${mahout_imp_feedback}</arg>
+
+            <arg>--numFeatures</arg>
+            <arg>${mahout_features}</arg>
+
+            <arg>--numIterations</arg>
+            <arg>${mahout_iterations}</arg>
+
+            <arg>--numThreadsPerSolver</arg>
+            <arg>${mahout_threads_per_solver}</arg>
+
+            <arg>--maxRating</arg>
+            <arg>${mahout_max_rating}</arg>
+
+            <arg>--numRecommendations</arg>
+            <arg>${mahout_num_recomm_als}</arg>
+
+            <arg>--numThreads</arg>
+            <arg>${mahout_num_threads}</arg>
+
+
+        </java>
+        <ok to="tmp-syrupad-recommend-mahout"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="spark-als-recomm">
+        <spark xmlns="uri:oozie:spark-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+                <property>
+                    <name>mapreduce.map.output.compress</name>
+                    <value>false</value>
+                </property>
+            </configuration>
+
+            <master>yarn-cluster</master>
+
+            <mode>cluster</mode>
+
+            <name>spark als</name>
+
+            <class>sparkprosecond.RecommendALS</class>
+
+            <jar>spark-als.jar</jar>
+
+            <spark-opts>
+                         --queue ${queueName}
+                         --conf spark.yarn.jar=${spark_lib}
+                         --conf spark.driver.extraJavaOptions=-Xss10m
+                         --conf spark.executor.extraJavaOptions=-Xss10m
+                         --driver-memory ${driverMem}
+                         --executor-memory  ${executorMem}
+                         --num-executors  ${executorNum}
+                         --executor-cores  ${executorCore}
+                         --conf spark.eventLog.enabled=${eventLogFlag}
+                         --conf spark.eventLog.dir=${eventLogDir}
+                         --conf spark.io.compression.codec=${compressCodec}
+                         --conf spark.history.fs.logDirectory=${historyLogDir}
+                         --conf spark.yarn.historyServer.address=${historyServer}
+                         --conf spark.history.ui.port=${historyPort}
+            </spark-opts>
+
+            <arg>${spark_input}</arg>
+
+            <arg>${spark_features}</arg>
+
+            <arg>${spark_iterations}</arg>
+
+            <arg>${spark_lambda}</arg>
+
+            <arg>${spark_output}</arg>
+
+            <arg>${spark_num_recomm_als}</arg>
+
+            <arg>${spark_imp_feedback}</arg>
+
+            <arg>${spark_alpha}</arg>
+
+        </spark>
+        <ok to="tmp-syrupad-recommend-spark"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="tmp-syrupad-recommend-mahout">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+
+            <script>syrupad_pbp/4step/01_01_tmp_syrupad_recommend_mahout.hql</script>
+            <param>oozie_job_name=${oozie_job_name}</param>
+            <param>jobId=${jobId}</param>
+        </hive>
+        <ok to="decision-reset"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="tmp-syrupad-recommend-spark">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+
+            <script>syrupad_pbp/4step/01_01_tmp_syrupad_recommend_spark.hql</script>
+            <param>oozie_job_name=${oozie_job_name}</param>
+            <param>jobId=${jobId}</param>
+        </hive>
+        <ok to="decision-reset"/>
+        <error to="email-noti" />
+    </action>
+
+    <decision name="decision-reset">
+        <switch>
+
+            <case to="daily-reset-audience-table">
+                ${ wf:actionData('get-dmp-parameters-from-db')['reset_high'] eq 1 }
+            </case>
+
+            <case to="svc-syrupad-recommend">
+                ${ wf:actionData('get-dmp-parameters-from-db')['reset_high'] eq 0 }
+            </case>
+
+            <default to="end"/>
+
+        </switch>
+    </decision>
+
+    <action name="daily-reset-audience-table">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+
+            <script>syrupad_pbp/4step/01_02_daily_reset_audience_table.hql</script>
+            <param>oozie_job_name=${oozie_job_name}</param>
+
+        </hive>
+        <ok to="svc-syrupad-recommend"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="svc-syrupad-recommend">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapreduce.job.queuename</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+
+            <script>syrupad_pbp/4step/02_svc_syrupad_recommend.hql</script>
+            <param>oozie_job_name=${oozie_job_name}</param>
+
+        </hive>
+        <ok to="impala-step-1"/>
+        <error to="email-noti" />
+    </action>
+
+
+    <!--
+    PBP PART ENDS HERE
+    -->
+
+
+    <kill name="kill">
+        <message>Action failed, error message[${wf:errorMessage(wf:lastErrorNode())}]</message>
+    </kill>
+    <end name="end"/>
+</workflow-app>

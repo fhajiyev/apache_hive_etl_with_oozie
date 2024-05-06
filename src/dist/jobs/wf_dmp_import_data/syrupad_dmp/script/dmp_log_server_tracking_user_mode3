@@ -1,0 +1,86 @@
+
+set mapreduce.job.reduces=128;
+
+set hivevar:daybefore;
+set hivevar:day90before;
+set hivevar:day91before;
+
+DROP TABLE IF EXISTS SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_TEMP3_NEW;
+CREATE TABLE SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_TEMP3_NEW
+(
+ DMP_UID  STRING
+,OCB_SERV STRING
+)
+CLUSTERED BY (DMP_UID) SORTED BY (DMP_UID) INTO 256 BUCKETS
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+;
+
+
+
+INSERT INTO SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_TEMP3_NEW
+
+       SELECT
+       DMP_UID,
+       OCB_SERV
+       FROM
+       (
+           SELECT
+           T2.DMP_UID,
+           T2.OCB_SERVS
+           FROM
+           (
+
+           SELECT
+           T1.DMP_UID,
+           T1.OCB_SERVS,
+           ROW_NUMBER() OVER(PARTITION BY DMP_UID ORDER BY LOG_TIME DESC ) AS RN
+           FROM
+           (
+
+           SELECT  REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+
+
+           CASE
+           WHEN GAID IS NOT NULL AND LENGTH(GAID)=36 AND GAID=LOWER(GAID) AND GAID <> '00000000-0000-0000-0000-000000000000' THEN CONCAT('(GAID)',GAID)
+           WHEN IDFA IS NOT NULL AND LENGTH(IDFA)=36 AND IDFA<>LOWER(IDFA) AND IDFA <> '00000000-0000-0000-0000-000000000000' THEN CONCAT('(IDFA)',IDFA)
+           ELSE DMP_UID
+           END
+
+
+           ,'\n',''),'\,',' '),'\;',' '),'\:',' ') AS DMP_UID
+
+           ,SPLIT(REFLECT('java.net.URLDecoder', 'decode', get_json_object(body, '$.col009')), ',') as OCB_SERVS
+           ,LOG_TIME
+           FROM DMP.LOG_SERVER_IDSYNC_COLLECT
+           WHERE ( get_json_object(BODY, '$.col001') = '9' AND get_json_object(BODY, '$.col005') = 'welcome' )
+           AND ( get_json_object(BODY, '$.col009') IS NOT NULL AND get_json_object(BODY, '$.col009') <> '')
+           AND PART_HOUR BETWEEN '${hivevar:day90before}00' AND '${hivevar:daybefore}24'
+           AND DSID = 'service_activity_log'
+           AND
+           (
+                                                                                                                      (
+                                                                                                                             DMP_UID IS NOT NULL
+                                                                                                                               AND
+                                                                                                                             SUBSTR(DMP_UID,1,6) = '(DMPC)'
+                                                                                                                               AND
+                                                                                                                             DMP_UID <> '(DMPC)00000000-0000-0000-0000-000000000000'
+                                                                                                                      )
+                                                                                                                      OR
+                                                                                                                      (
+                                                                                                                            (GAID IS NOT NULL AND LENGTH(GAID)=36 AND GAID= LOWER(GAID) AND GAID <> '00000000-0000-0000-0000-000000000000')
+                                                                                                                               OR
+                                                                                                                            (IDFA IS NOT NULL AND LENGTH(IDFA)=36 AND IDFA<>LOWER(IDFA) AND IDFA <> '00000000-0000-0000-0000-000000000000')
+                                                                                                                      )
+           )
+
+           ) T1
+           WHERE T1.OCB_SERVS IS NOT NULL AND SIZE(T1.OCB_SERVS) > 0
+
+           ) T2
+           WHERE  T2.RN = 1
+
+       ) T3
+       LATERAL VIEW EXPLODE(T3.OCB_SERVS) OCB_SERVS_VIEW as OCB_SERV
+       ;
+

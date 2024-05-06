@@ -1,0 +1,1538 @@
+<workflow-app name="wf_dmp_import_data_2" xmlns="uri:oozie:workflow:0.4">
+
+
+    <start to="select_job"/>
+
+    <decision name="select_job">
+        <switch>
+            <case to="dmp-pi-id-pool-import">
+                ${(oozie_job_name == "dmp-pi-daily-job")}
+            </case>
+            <case to="import-dmp-pi-00-hr">
+                ${(oozie_job_name == "dmp-pi-hourly-job")}
+            </case>
+            <case to="import-dmp-pi-integr-context">
+                ${(oozie_job_name == "dmp-pi-integr-context-helper")}
+            </case>
+            <default to="end"/>
+        </switch>
+    </decision>
+
+
+
+    <action name="import-dmp-pi-integr-context">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_integr_context_helper.hql</script>
+            <param>daybefore=${daybefore}</param>
+        </hive2>
+        <ok to="end"/>
+        <error to="email-noti" />
+    </action>
+
+    <!--<start to="dmp-pi-id-pool-import"/>-->
+
+    <action name="import-dmp-pi-00-hr">
+            <hive2 xmlns="uri:oozie:hive2-action:0.1">
+                <job-tracker>${jobTracker}</job-tracker>
+                <name-node>${nameNode}</name-node>
+                <job-xml>${hiveSiteXML}</job-xml>
+                <configuration>
+                    <property>
+                        <name>tez.queue.name</name>
+                        <value>${queueName}</value>
+                    </property>
+                </configuration>
+                <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+                <script>${ScriptPathHive}/hourly/import_dmp_audience_upload.hql</script>
+                <param>hourbefore=${hourbefore}</param>
+                <param>hourcurrent=${hourcurrent}</param>
+                <param>hour91before=${hour91before}</param>
+                <param>hour2before=${hour2before}</param>
+            </hive2>
+            <ok to="rename-partition"/>
+            <error to="email-noti" />
+    </action>
+
+    <action name="rename-partition">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/hourly/rename_partition.hql</script>
+            <param>hourbefore=${hourbefore}</param>
+            <param>hourcurrent=${hourcurrent}</param>
+            <param>hour91before=${hour91before}</param>
+            <param>hour2before=${hour2before}</param>
+        </hive2>
+        <ok to="impala-parquet"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="impala-parquet">
+        <ssh xmlns="uri:oozie:ssh-action:0.1">
+            <host>dmp_pi@DSc-diif01</host>
+            <command>/app/dmp_pi/dmp_pi/jobs/wf_dmp_import_data_2/impala/parquet_prepare.sh</command>
+        </ssh>
+        <ok to="end"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="dmp-pi-id-pool-import">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_pi_id_pool.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+        </hive2>
+        <ok to="dmp-pi-etl-import-fork"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+    <fork name="dmp-pi-etl-import-fork">
+        <path start="import-dmp-pi-20-start"></path>
+        <path start="import-dmp-pi-16-start"></path>
+        <path start="import-dmp-pi-17-start"></path>
+        <path start="import-dmp-pi-06-start"></path>
+        <path start="import-dmp-pi-00-start"></path>
+        <path start="import-dmp-pi-05-start"></path>
+        <!-- <path start="import-dmp-pi-08-start"></path> -->
+    </fork>
+
+
+
+
+    <!-- demo fork (20,19,18) -->
+
+                                <action name="import-dmp-pi-20-start">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "start_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-20"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-20">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_20.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-20-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-20-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-19"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+
+    <action name="import-dmp-pi-19">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_19.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-19-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-19-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-18"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-18">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_18.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-18-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-18-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-33"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <!--
+    <action name="import-dmp-pi-32">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_32.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-32-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-32-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-33"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+    -->
+
+    <action name="import-dmp-pi-33">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_33.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day182before=${day182before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-33-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-33-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-35"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-35">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_35.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-35-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-35-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-36"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-36">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_36.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-36-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-36-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-37"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-37">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_37.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-37-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-37-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-39"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-39">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_39.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day182before=${day182before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-39-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-39-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-38"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-38">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_38.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-38-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-38-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="join-etl-import-fork"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <!-- 11st purchase fork -->
+
+                                <action name="import-dmp-pi-16-start">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "start_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-16"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-16">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_16.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day2before_hyp=${day2before_hyp}</param>
+            <param>day16before_hyp=${day16before_hyp}</param>
+            <param>day730before=${day730before}</param>
+            <param>day367before=${day367before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-16-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-16-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-34"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-34">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_34.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day182before=${day182before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-34-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-34-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-48"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+
+    <action name="import-dmp-pi-48">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_48.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-48-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-48-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-50"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+
+    <action name="import-dmp-pi-50">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_50.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-50-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-50-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-51"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-51">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_51.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-51-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-51-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-52"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-52">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_52.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day182before=${day182before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-52-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-52-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="join-etl-import-fork"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <!-- SW Action data fork -->
+
+                                <action name="import-dmp-pi-06-start">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "start_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-06"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-06">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_06.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day182before=${day182before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-06-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-06-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-41"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-41">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_41.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+            <param>day367before=${day367before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-41-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-41-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-45"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-45">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_45.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day92before=${day92before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-45-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-45-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="join-etl-import-fork"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <!-- 11st basket fork -->
+
+
+                                <action name="import-dmp-pi-17-start">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "start_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-17"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-17">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_17.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day2before_hyp=${day2before_hyp}</param>
+            <param>day271before_hyp=${day271before_hyp}</param>
+            <param>day367before=${day367before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-17-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-17-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="join-etl-import-fork"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <!-- OCB Transaction fork -->
+
+                                <action name="import-dmp-pi-05-start">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "start_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-05"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-05">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_05.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day2before_yyyymm=${day2before_yyyymm}</param>
+            <param>day367before=${day367before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-05-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-05-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-44"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-44">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_44.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+            <param>day367before=${day367before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-44-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-44-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-43"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-43">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_43.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+            <param>day367before=${day367before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-43-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-43-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-53"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-53">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_53.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day92before=${day92before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-53-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-53-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-54"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-54">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_54.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-54-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-54-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-55"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-55">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_55.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day367before=${day367before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-55-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-55-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="join-etl-import-fork"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <!-- Proximity Foot TR fork -->
+
+                                <action name="import-dmp-pi-08-start">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "start_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-08"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-08">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_08.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day92before=${day92before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-08-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-08-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="join-etl-import-fork"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <!-- audience upload fork (NOT TEZ!!!) -->
+
+                                <action name="import-dmp-pi-00-start">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "start_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-00"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-00">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_audience_upload.hql</script>
+            <param>daybefore=${daybefore}</param>
+            <param>day2before=${day2before}</param>
+            <param>daycurr=${daycurr}</param>
+        </hive2>
+        <ok to="import-dmp-pi-00-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-00-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-01"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-01">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_01.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-01-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-01-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-04"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <!--
+    <action name="import-dmp-pi-02">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_02.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day182before=${day182before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-02-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-02-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-04"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+    -->
+
+    <action name="import-dmp-pi-04">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_04.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day182before=${day182before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-04-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-04-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-09"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-09">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_09.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day182before=${day182before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-09-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-09-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-10"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-10">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_10.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-10-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-10-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-13"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-13">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_13.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day92before=${day92before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-13-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                                <action name="import-dmp-pi-13-end">
+                                    <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                        <host>dmp_pi@DSc-diif01</host>
+                                        <command>echo "end_time=`date '+%s'`"</command>
+                                        <capture-output/>
+                                    </ssh>
+                                    <ok to="import-dmp-pi-15"/>
+                                    <error to="recover-parquet-batch" />
+                                </action>
+
+    <action name="import-dmp-pi-15">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_15.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day367before=${day367before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-15-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                            <action name="import-dmp-pi-15-end">
+                                <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                    <host>dmp_pi@DSc-diif01</host>
+                                    <command>echo "end_time=`date '+%s'`"</command>
+                                    <capture-output/>
+                                </ssh>
+                                <ok to="import-dmp-pi-21"/>
+                                <error to="recover-parquet-batch" />
+                            </action>
+
+    <action name="import-dmp-pi-21">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+                <property>
+                    <name>oozie.action.sharelib.for.hive2</name>
+                    <value>hive2-2.1</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:21500</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_21.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-21-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                            <action name="import-dmp-pi-21-end">
+                                <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                    <host>dmp_pi@DSc-diif01</host>
+                                    <command>echo "end_time=`date '+%s'`"</command>
+                                    <capture-output/>
+                                </ssh>
+                                <ok to="import-dmp-pi-07"/>
+                                <error to="recover-parquet-batch" />
+                            </action>
+
+    <action name="import-dmp-pi-07">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_07.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day367before=${day367before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-07-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                            <action name="import-dmp-pi-07-end">
+                                <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                    <host>dmp_pi@DSc-diif01</host>
+                                    <command>echo "end_time=`date '+%s'`"</command>
+                                    <capture-output/>
+                                </ssh>
+                                <ok to="import-dmp-pi-40"/>
+                                <error to="recover-parquet-batch" />
+                            </action>
+
+    <action name="import-dmp-pi-40">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_40.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day182before=${day182before}</param>
+        </hive2>
+        <ok to="import-dmp-pi-40-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                            <action name="import-dmp-pi-40-end">
+                                <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                    <host>dmp_pi@DSc-diif01</host>
+                                    <command>echo "end_time=`date '+%s'`"</command>
+                                    <capture-output/>
+                                </ssh>
+                                <ok to="join-etl-import-fork"/>
+                                <error to="recover-parquet-batch" />
+                            </action>
+
+
+
+    <join name="join-etl-import-fork" to="join-all-end"/>
+
+                            <action name="join-all-end">
+                                <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                    <host>dmp_pi@DSc-diif01</host>
+                                    <command>echo "end_time=`date '+%s'`"</command>
+                                    <capture-output/>
+                                </ssh>
+                                <ok to="import-dmp-pi-23"/>
+                                <error to="recover-parquet-batch" />
+                            </action>
+
+    <action name="import-dmp-pi-23">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/import_dmp_new_storage_23.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day5before=${day5before}</param>
+            <param>day367before=${day367before}</param>
+            <param>daycurr=${daycurr}</param>
+        </hive2>
+        <ok to="import-dmp-pi-23-end"/>
+        <error to="recover-parquet-batch" />
+    </action>
+
+                            <action name="import-dmp-pi-23-end">
+                                <ssh xmlns="uri:oozie:ssh-action:0.1">
+                                    <host>dmp_pi@DSc-diif01</host>
+                                    <command>echo "end_time=`date '+%s'`"</command>
+                                    <capture-output/>
+                                </ssh>
+                                <ok to="dmp-timing-log-branch"/>
+                                <error to="email-noti" />
+                            </action>
+
+    <!--
+    <action name="remove-demo-previous">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/remove_demo_prev.hql</script>
+            <param>day2before=${day2before}</param>
+        </hive2>
+        <ok to="dmp-timing-log-branch"/>
+        <error to="email-noti" />
+    </action>
+    -->
+
+    <action name="dmp-timing-log-branch">
+        <ssh xmlns="uri:oozie:ssh-action:0.1">
+            <host>dmp_pi@DSc-diif01</host>
+            <command>/app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 20 ${wf:actionData('import-dmp-pi-20-start')['start_time']} ${wf:actionData('import-dmp-pi-20-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 19 ${wf:actionData('import-dmp-pi-20-end')['end_time']} ${wf:actionData('import-dmp-pi-19-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 18 ${wf:actionData('import-dmp-pi-19-end')['end_time']} ${wf:actionData('import-dmp-pi-18-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 33 ${wf:actionData('import-dmp-pi-18-end')['end_time']} ${wf:actionData('import-dmp-pi-33-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 35 ${wf:actionData('import-dmp-pi-33-end')['end_time']} ${wf:actionData('import-dmp-pi-35-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 36 ${wf:actionData('import-dmp-pi-35-end')['end_time']} ${wf:actionData('import-dmp-pi-36-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 37 ${wf:actionData('import-dmp-pi-36-end')['end_time']} ${wf:actionData('import-dmp-pi-37-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 39 ${wf:actionData('import-dmp-pi-37-end')['end_time']} ${wf:actionData('import-dmp-pi-39-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 38 ${wf:actionData('import-dmp-pi-39-end')['end_time']} ${wf:actionData('import-dmp-pi-38-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 16 ${wf:actionData('import-dmp-pi-16-start')['start_time']} ${wf:actionData('import-dmp-pi-16-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 34 ${wf:actionData('import-dmp-pi-16-end')['end_time']} ${wf:actionData('import-dmp-pi-34-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 48 ${wf:actionData('import-dmp-pi-34-end')['end_time']} ${wf:actionData('import-dmp-pi-48-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 50 ${wf:actionData('import-dmp-pi-48-end')['end_time']} ${wf:actionData('import-dmp-pi-50-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 51 ${wf:actionData('import-dmp-pi-50-end')['end_time']} ${wf:actionData('import-dmp-pi-51-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 52 ${wf:actionData('import-dmp-pi-51-end')['end_time']} ${wf:actionData('import-dmp-pi-52-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh  6 ${wf:actionData('import-dmp-pi-06-start')['start_time']} ${wf:actionData('import-dmp-pi-06-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 41 ${wf:actionData('import-dmp-pi-06-end')['end_time']} ${wf:actionData('import-dmp-pi-41-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 45 ${wf:actionData('import-dmp-pi-41-end')['end_time']} ${wf:actionData('import-dmp-pi-45-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 17 ${wf:actionData('import-dmp-pi-17-start')['start_time']} ${wf:actionData('import-dmp-pi-17-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh  5 ${wf:actionData('import-dmp-pi-05-start')['start_time']} ${wf:actionData('import-dmp-pi-05-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 44 ${wf:actionData('import-dmp-pi-05-end')['end_time']} ${wf:actionData('import-dmp-pi-44-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 43 ${wf:actionData('import-dmp-pi-44-end')['end_time']} ${wf:actionData('import-dmp-pi-43-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 53 ${wf:actionData('import-dmp-pi-43-end')['end_time']} ${wf:actionData('import-dmp-pi-53-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 54 ${wf:actionData('import-dmp-pi-53-end')['end_time']} ${wf:actionData('import-dmp-pi-54-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 55 ${wf:actionData('import-dmp-pi-54-end')['end_time']} ${wf:actionData('import-dmp-pi-55-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh  0 ${wf:actionData('import-dmp-pi-00-start')['start_time']} ${wf:actionData('import-dmp-pi-00-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh  1 ${wf:actionData('import-dmp-pi-00-end')['end_time']} ${wf:actionData('import-dmp-pi-01-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh  4 ${wf:actionData('import-dmp-pi-01-end')['end_time']} ${wf:actionData('import-dmp-pi-04-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh  9 ${wf:actionData('import-dmp-pi-04-end')['end_time']} ${wf:actionData('import-dmp-pi-09-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 10 ${wf:actionData('import-dmp-pi-09-end')['end_time']} ${wf:actionData('import-dmp-pi-10-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 13 ${wf:actionData('import-dmp-pi-10-end')['end_time']} ${wf:actionData('import-dmp-pi-13-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 15 ${wf:actionData('import-dmp-pi-13-end')['end_time']} ${wf:actionData('import-dmp-pi-15-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 21 ${wf:actionData('import-dmp-pi-15-end')['end_time']} ${wf:actionData('import-dmp-pi-21-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 40 ${wf:actionData('import-dmp-pi-07-end')['end_time']} ${wf:actionData('import-dmp-pi-40-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_meta.sh 23 ${wf:actionData('join-all-end')['end_time']}         ${wf:actionData('import-dmp-pi-23-end')['end_time']} &amp;&amp;
+                /app/dmp_pi/dmp_pi/dsp_categ_db/dmp_timing_dbload.sh
+            </command>
+        </ssh>
+        <ok to="end"/>
+        <error to="email-noti" />
+    </action>
+
+
+
+
+
+    <action name="recover-parquet-batch">
+        <hive2 xmlns="uri:oozie:hive2-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>tez.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <jdbc-url>jdbc:hive2://10.10.62.37:20100</jdbc-url>
+            <script>${ScriptPathHive}/recover_parquet.hql</script>
+            <param>day2before=${day2before}</param>
+            <param>day3before=${day3before}</param>
+        </hive2>
+        <ok to="dmp-parquet-prepare-fail"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="dmp-parquet-prepare-fail">
+        <ssh xmlns="uri:oozie:ssh-action:0.1">
+            <host>dmp_pi@DSc-diif01</host>
+            <command>/app/dmp_pi/dmp_pi/jobs/wf_dmp_import_data_2/impala/parquet_prepare.sh</command>
+        </ssh>
+        <ok to="email-noti"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="email-noti">
+        <email xmlns="uri:oozie:email-action:0.1">
+            <to>${emailNotiTo}</to>
+            <subject>[WF@${nameNode}]${(empty wf:lastErrorNode() )? 'SUCCESS' : 'FAILURE'} : ${wf:name()}(${wf:id()}, ${day2before})</subject>
+            <body>
+                <![CDATA[[${wf:name()}(${wf:id()})] in [${wf:appPath()}] at [${timestamp()}]<br>${(empty wf:lastErrorNode()) ? 'Workflow succeeded.' : 'Action failed.'}<br>${(empty wf:lastErrorNode()) ? '' : concat(concat(wf:lastErrorNode(), ' => '), wf:errorMessage(wf:lastErrorNode()))}<br>]]>
+            </body>
+        </email>
+        <ok to="kill" />
+        <error to="kill" />
+    </action>
+
+    <kill name="kill">
+        <message>Action failed, error message[${wf:errorMessage(wf:lastErrorNode())}]</message>
+    </kill>
+    <end name="end"/>
+</workflow-app>
+

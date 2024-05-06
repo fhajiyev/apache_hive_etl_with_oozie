@@ -1,0 +1,6 @@
+USE svc_ds_dmp;
+
+INVALIDATE METADATA svc_ds_dmp.svc_event_log;
+INVALIDATE METADATA tad.log_server_event;
+INVALIDATE METADATA svc_ds_dmp.svc_syrupad_recommend;
+

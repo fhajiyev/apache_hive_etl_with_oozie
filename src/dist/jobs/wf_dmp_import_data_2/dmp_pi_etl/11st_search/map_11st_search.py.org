@@ -1,0 +1,61 @@
+#!/usr/bin/python
+#-*- coding: utf-8 -*-
+
+import sys
+import os
+import datetime
+
+try:
+    src = os.environ['mapreduce_map_input_file']
+except:
+    src = 'hdfs://skpds/data_bis/11st/dm/log_mobile_keywords/2017/05/23/000.gz'
+    src = 'hdfs://skpds/data_bis/11st/dm/log_web_keywords/2017/05/23/000.gz'
+#    src = 'dmp_pi_id_pool'
+    pass
+
+
+if 'keywords' in src:
+    weeks     = ( 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun' )
+    dt_date   = ''.join(src.split('/')[-4:-1])
+
+    try:
+        dt_year  = dt_date[0:4]
+        dt_month = dt_date[4:6]
+        dt_day   = dt_date[6:8]
+        target_day = datetime.date(int(dt_year), int(dt_month), int(dt_day))
+        c_week = weeks[target_day.weekday()]
+
+    except:
+        c_week = ''
+
+for line in sys.stdin:
+    s = line.rstrip('\n').split('\t')
+
+    if 'dmp_pi_id_pool' in src:
+        member_no = s[3].strip()
+        ci        = s[0].strip()
+        
+        if member_no == '-1' or member_no == '' or member_no == '\N':
+	    continue
+
+	if ci == '' or ci == '\N':
+	    continue
+
+        print '\t'.join([ member_no, ci ])
+
+    else:
+	try:
+            member_no = s[1].strip()
+            kword     = s[4].strip()
+	except:
+	    continue
+
+        if member_no == '-1' or member_no == '' or member_no == '\N':
+            continue
+
+	if kword == '' or kword == '\N':
+	    continue
+  
+        print '\t'.join([ member_no, dt_date, '', c_week, 'search', kword ])
+
+

@@ -1,0 +1,29 @@
+
+
+
+use SVC_CSW1;
+
+set hivevar:MetaPathHive;
+
+DROP TABLE IF EXISTS TEMP_DMP_POC_CODE;
+
+CREATE TABLE TEMP_DMP_POC_CODE
+(
+
+    ENT          STRING,
+    ATT          STRING,
+    BIT_ATT      STRING,
+    NAME         STRING,
+    ENGLISH_NAME STRING,
+    VALUE1       STRING,
+    VALUE2       STRING,
+    SORT_ORD     STRING,
+    STATUS_GB    STRING,
+    API_FL       STRING,
+    COMMENT      STRING
+
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '|';
+
+
+LOAD DATA INPATH '${hivevar:MetaPathHive}/poc_code/part-m-00000' INTO TABLE TEMP_DMP_POC_CODE;

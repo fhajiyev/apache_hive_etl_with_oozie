@@ -1,0 +1,607 @@
+<workflow-app name="wf_ading_${periodType}_stat_${toYYYYMMDD}" xmlns="uri:oozie:workflow:0.4">
+    <start to="create-base"/>
+
+    <action name="create-base">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>hive_ading_base.hql</script>
+            <param>NEXR_UDF_JAR=${hiveNexrUdfJar}</param>
+            <param>ADING_UDF_JAR=${hiveAdingUdfJar}</param>
+            <param>DB=${hiveDatabase}</param>
+            <param>PREFIX_PERIOD_TYPE=${prefixPeriodType}</param>
+            <param>START_YYYYMMDD=${fromYYYYMMDD}</param>
+            <param>END_YYYYMMDD=${toYYYYMMDD}</param>
+        </hive>
+        <ok to="fork-stat"/>
+        <error to="email-noti" />
+    </action>
+
+    <fork name="fork-stat">
+        <path start="user-stat"/>
+        <path start="exec-count-stat"/>
+        <path start="exec-time-stat"/>
+        <path start="time-stat"/>
+        <path start="week-day-stat"/>
+        <path start="page-stat"/>
+        <path start="app-version-stat"/>
+        <path start="action-stat"/>
+        <path start="device-stat"/>
+        <path start="os-stat"/>
+        <path start="resolution-stat"/>
+    </fork>
+
+    <action name="user-stat">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>hive_ading_user_stat.hql</script>
+            <param>DB=${hiveDatabase}</param>
+            <param>PERIOD_TYPE=${periodType}</param>
+            <param>PREFIX_PERIOD_TYPE=${prefixPeriodType}</param>
+            <param>START_YYYYMMDD=${fromYYYYMMDD}</param>
+            <param>END_YYYYMMDD=${toYYYYMMDD}</param>
+        </hive>
+        <ok to="user-stat-export"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="user-stat-export">
+        <sqoop xmlns="uri:oozie:sqoop-action:0.2">
+            <job-tracker>${jobTracker4DBif}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <arg>export</arg>
+            <arg>--connect</arg>
+            <arg>${oracleConnection}</arg>
+            <arg>--username</arg>
+            <arg>${oracleUser}</arg>
+            <arg>--password</arg>
+            <arg>${oraclePassword}</arg>
+            <arg>--table</arg>
+            <arg>ADING_USER_STAT</arg>
+            <arg>--export-dir</arg>
+            <arg>${hiveHdfsDir}/${prefixPeriodType}_${toYYYYMMDD}_ading_user_stat</arg>
+            <arg>--input-fields-terminated-by</arg>
+            <arg>\t</arg>
+            <arg>--update-key</arg>
+            <arg>PERIOD_TYPE,SDATE,EDATE,APP_CODE,USER_TYPE,GENDER,AGE</arg>
+            <arg>--update-mode</arg>
+            <arg>allowinsert</arg>
+        </sqoop>
+        <ok to="join-stat"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="exec-count-stat">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>hive_ading_exec_count_stat.hql</script>
+            <param>DB=${hiveDatabase}</param>
+            <param>PERIOD_TYPE=${periodType}</param>
+            <param>PREFIX_PERIOD_TYPE=${prefixPeriodType}</param>
+            <param>START_YYYYMMDD=${fromYYYYMMDD}</param>
+            <param>END_YYYYMMDD=${toYYYYMMDD}</param>
+        </hive>
+        <ok to="exec-count-stat-export"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="exec-count-stat-export">
+        <sqoop xmlns="uri:oozie:sqoop-action:0.2">
+            <job-tracker>${jobTracker4DBif}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <arg>export</arg>
+            <arg>--connect</arg>
+            <arg>${oracleConnection}</arg>
+            <arg>--username</arg>
+            <arg>${oracleUser}</arg>
+            <arg>--password</arg>
+            <arg>${oraclePassword}</arg>
+            <arg>--table</arg>
+            <arg>ADING_EXEC_COUNT_STAT</arg>
+            <arg>--export-dir</arg>
+            <arg>${hiveHdfsDir}/${prefixPeriodType}_${toYYYYMMDD}_ading_exec_count_stat</arg>
+            <arg>--input-fields-terminated-by</arg>
+            <arg>\t</arg>
+            <arg>--update-key</arg>
+            <arg>PERIOD_TYPE,SDATE,EDATE,APP_CODE,USER_TYPE,STEP_EXEC</arg>
+            <arg>--update-mode</arg>
+            <arg>allowinsert</arg>
+        </sqoop>
+        <ok to="join-stat"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="exec-time-stat">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>hive_ading_exec_time_stat.hql</script>
+            <param>DB=${hiveDatabase}</param>
+            <param>PERIOD_TYPE=${periodType}</param>
+            <param>PREFIX_PERIOD_TYPE=${prefixPeriodType}</param>
+            <param>START_YYYYMMDD=${fromYYYYMMDD}</param>
+            <param>END_YYYYMMDD=${toYYYYMMDD}</param>
+        </hive>
+        <ok to="exec-time-stat-export"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="exec-time-stat-export">
+        <sqoop xmlns="uri:oozie:sqoop-action:0.2">
+            <job-tracker>${jobTracker4DBif}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <arg>export</arg>
+            <arg>--connect</arg>
+            <arg>${oracleConnection}</arg>
+            <arg>--username</arg>
+            <arg>${oracleUser}</arg>
+            <arg>--password</arg>
+            <arg>${oraclePassword}</arg>
+            <arg>--table</arg>
+            <arg>ADING_EXEC_TIME_STAT</arg>
+            <arg>--export-dir</arg>
+            <arg>${hiveHdfsDir}/${prefixPeriodType}_${toYYYYMMDD}_ading_exec_time_stat</arg>
+            <arg>--input-fields-terminated-by</arg>
+            <arg>\t</arg>
+            <arg>--update-key</arg>
+            <arg>PERIOD_TYPE,SDATE,EDATE,APP_CODE,USER_TYPE,STEP_TIME</arg>
+            <arg>--update-mode</arg>
+            <arg>allowinsert</arg>
+        </sqoop>
+        <ok to="join-stat"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="time-stat">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>hive_ading_time_stat.hql</script>
+            <param>DB=${hiveDatabase}</param>
+            <param>PERIOD_TYPE=${periodType}</param>
+            <param>PREFIX_PERIOD_TYPE=${prefixPeriodType}</param>
+            <param>START_YYYYMMDD=${fromYYYYMMDD}</param>
+            <param>END_YYYYMMDD=${toYYYYMMDD}</param>
+        </hive>
+        <ok to="time-stat-export"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="time-stat-export">
+        <sqoop xmlns="uri:oozie:sqoop-action:0.2">
+            <job-tracker>${jobTracker4DBif}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <arg>export</arg>
+            <arg>--connect</arg>
+            <arg>${oracleConnection}</arg>
+            <arg>--username</arg>
+            <arg>${oracleUser}</arg>
+            <arg>--password</arg>
+            <arg>${oraclePassword}</arg>
+            <arg>--table</arg>
+            <arg>ADING_TIME_STAT</arg>
+            <arg>--export-dir</arg>
+            <arg>${hiveHdfsDir}/${prefixPeriodType}_${toYYYYMMDD}_ading_time_stat</arg>
+            <arg>--input-fields-terminated-by</arg>
+            <arg>\t</arg>
+            <arg>--update-key</arg>
+            <arg>PERIOD_TYPE,SDATE,EDATE,APP_CODE,USER_TYPE,TIME</arg>
+            <arg>--update-mode</arg>
+            <arg>allowinsert</arg>
+        </sqoop>
+        <ok to="join-stat"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="week-day-stat">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>hive_ading_week_day_stat.hql</script>
+            <param>DB=${hiveDatabase}</param>
+            <param>PERIOD_TYPE=${periodType}</param>
+            <param>PREFIX_PERIOD_TYPE=${prefixPeriodType}</param>
+            <param>START_YYYYMMDD=${fromYYYYMMDD}</param>
+            <param>END_YYYYMMDD=${toYYYYMMDD}</param>
+        </hive>
+        <ok to="week-day-stat-export"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="week-day-stat-export">
+        <sqoop xmlns="uri:oozie:sqoop-action:0.2">
+            <job-tracker>${jobTracker4DBif}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <arg>export</arg>
+            <arg>--connect</arg>
+            <arg>${oracleConnection}</arg>
+            <arg>--username</arg>
+            <arg>${oracleUser}</arg>
+            <arg>--password</arg>
+            <arg>${oraclePassword}</arg>
+            <arg>--table</arg>
+            <arg>ADING_WEEK_DAY_STAT</arg>
+            <arg>--export-dir</arg>
+            <arg>${hiveHdfsDir}/${prefixPeriodType}_${toYYYYMMDD}_ading_week_day_stat</arg>
+            <arg>--input-fields-terminated-by</arg>
+            <arg>\t</arg>
+            <arg>--update-key</arg>
+            <arg>PERIOD_TYPE,SDATE,EDATE,APP_CODE,USER_TYPE,STEP_WEEK_DAY</arg>
+            <arg>--update-mode</arg>
+            <arg>allowinsert</arg>
+        </sqoop>
+        <ok to="join-stat"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="page-stat">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>hive_ading_page_stat.hql</script>
+            <param>DB=${hiveDatabase}</param>
+            <param>PERIOD_TYPE=${periodType}</param>
+            <param>PREFIX_PERIOD_TYPE=${prefixPeriodType}</param>
+            <param>START_YYYYMMDD=${fromYYYYMMDD}</param>
+            <param>END_YYYYMMDD=${toYYYYMMDD}</param>
+        </hive>
+        <ok to="page-stat-export"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="page-stat-export">
+        <sqoop xmlns="uri:oozie:sqoop-action:0.2">
+            <job-tracker>${jobTracker4DBif}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <arg>export</arg>
+            <arg>--connect</arg>
+            <arg>${oracleConnection}</arg>
+            <arg>--username</arg>
+            <arg>${oracleUser}</arg>
+            <arg>--password</arg>
+            <arg>${oraclePassword}</arg>
+            <arg>--table</arg>
+            <arg>ADING_PAGE_STAT</arg>
+            <arg>--export-dir</arg>
+            <arg>${hiveHdfsDir}/${prefixPeriodType}_${toYYYYMMDD}_ading_page_stat</arg>
+            <arg>--input-fields-terminated-by</arg>
+            <arg>\t</arg>
+            <arg>--update-key</arg>
+            <arg>PERIOD_TYPE,SDATE,EDATE,APP_CODE,USER_TYPE,PAGE</arg>
+            <arg>--update-mode</arg>
+            <arg>allowinsert</arg>
+        </sqoop>
+        <ok to="join-stat"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="app-version-stat">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>hive_ading_app_version_stat.hql</script>
+            <param>DB=${hiveDatabase}</param>
+            <param>PERIOD_TYPE=${periodType}</param>
+            <param>PREFIX_PERIOD_TYPE=${prefixPeriodType}</param>
+            <param>START_YYYYMMDD=${fromYYYYMMDD}</param>
+            <param>END_YYYYMMDD=${toYYYYMMDD}</param>
+        </hive>
+        <ok to="app-version-stat-export"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="app-version-stat-export">
+        <sqoop xmlns="uri:oozie:sqoop-action:0.2">
+            <job-tracker>${jobTracker4DBif}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <arg>export</arg>
+            <arg>--connect</arg>
+            <arg>${oracleConnection}</arg>
+            <arg>--username</arg>
+            <arg>${oracleUser}</arg>
+            <arg>--password</arg>
+            <arg>${oraclePassword}</arg>
+            <arg>--table</arg>
+            <arg>ADING_APP_VERSION_STAT</arg>
+            <arg>--export-dir</arg>
+            <arg>${hiveHdfsDir}/${prefixPeriodType}_${toYYYYMMDD}_ading_app_version_stat</arg>
+            <arg>--input-fields-terminated-by</arg>
+            <arg>\t</arg>
+            <arg>--update-key</arg>
+            <arg>PERIOD_TYPE,SDATE,EDATE,APP_CODE,USER_TYPE,APP_VERSION</arg>
+            <arg>--update-mode</arg>
+            <arg>allowinsert</arg>
+        </sqoop>
+        <ok to="join-stat"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="action-stat">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>hive_ading_action_stat.hql</script>
+            <param>DB=${hiveDatabase}</param>
+            <param>PERIOD_TYPE=${periodType}</param>
+            <param>PREFIX_PERIOD_TYPE=${prefixPeriodType}</param>
+            <param>START_YYYYMMDD=${fromYYYYMMDD}</param>
+            <param>END_YYYYMMDD=${toYYYYMMDD}</param>
+        </hive>
+        <ok to="action-stat-export"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="action-stat-export">
+        <sqoop xmlns="uri:oozie:sqoop-action:0.2">
+            <job-tracker>${jobTracker4DBif}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <arg>export</arg>
+            <arg>--connect</arg>
+            <arg>${oracleConnection}</arg>
+            <arg>--username</arg>
+            <arg>${oracleUser}</arg>
+            <arg>--password</arg>
+            <arg>${oraclePassword}</arg>
+            <arg>--table</arg>
+            <arg>ADING_ACTION_STAT</arg>
+            <arg>--export-dir</arg>
+            <arg>${hiveHdfsDir}/${prefixPeriodType}_${toYYYYMMDD}_ading_action_stat</arg>
+            <arg>--input-fields-terminated-by</arg>
+            <arg>\t</arg>
+            <arg>--update-key</arg>
+            <arg>PERIOD_TYPE,SDATE,EDATE,APP_CODE,USER_TYPE,ACTION</arg>
+            <arg>--update-mode</arg>
+            <arg>allowinsert</arg>
+        </sqoop>
+        <ok to="join-stat"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="device-stat">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>hive_ading_device_stat.hql</script>
+            <param>DB=${hiveDatabase}</param>
+            <param>PERIOD_TYPE=${periodType}</param>
+            <param>PREFIX_PERIOD_TYPE=${prefixPeriodType}</param>
+            <param>START_YYYYMMDD=${fromYYYYMMDD}</param>
+            <param>END_YYYYMMDD=${toYYYYMMDD}</param>
+        </hive>
+        <ok to="device-stat-export"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="device-stat-export">
+        <sqoop xmlns="uri:oozie:sqoop-action:0.2">
+            <job-tracker>${jobTracker4DBif}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <arg>export</arg>
+            <arg>--connect</arg>
+            <arg>${oracleConnection}</arg>
+            <arg>--username</arg>
+            <arg>${oracleUser}</arg>
+            <arg>--password</arg>
+            <arg>${oraclePassword}</arg>
+            <arg>--table</arg>
+            <arg>ADING_DEVICE_STAT</arg>
+            <arg>--export-dir</arg>
+            <arg>${hiveHdfsDir}/${prefixPeriodType}_${toYYYYMMDD}_ading_device_stat</arg>
+            <arg>--input-fields-terminated-by</arg>
+            <arg>\t</arg>
+            <arg>--update-key</arg>
+            <arg>PERIOD_TYPE,SDATE,EDATE,APP_CODE,DEVICE</arg>
+            <arg>--update-mode</arg>
+            <arg>allowinsert</arg>
+        </sqoop>
+        <ok to="join-stat"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="os-stat">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>hive_ading_os_stat.hql</script>
+            <param>DB=${hiveDatabase}</param>
+            <param>PERIOD_TYPE=${periodType}</param>
+            <param>PREFIX_PERIOD_TYPE=${prefixPeriodType}</param>
+            <param>START_YYYYMMDD=${fromYYYYMMDD}</param>
+            <param>END_YYYYMMDD=${toYYYYMMDD}</param>
+        </hive>
+        <ok to="os-stat-export"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="os-stat-export">
+        <sqoop xmlns="uri:oozie:sqoop-action:0.2">
+            <job-tracker>${jobTracker4DBif}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <arg>export</arg>
+            <arg>--connect</arg>
+            <arg>${oracleConnection}</arg>
+            <arg>--username</arg>
+            <arg>${oracleUser}</arg>
+            <arg>--password</arg>
+            <arg>${oraclePassword}</arg>
+            <arg>--table</arg>
+            <arg>ADING_OS_STAT</arg>
+            <arg>--export-dir</arg>
+            <arg>${hiveHdfsDir}/${prefixPeriodType}_${toYYYYMMDD}_ading_os_stat</arg>
+            <arg>--input-fields-terminated-by</arg>
+            <arg>\t</arg>
+            <arg>--update-key</arg>
+            <arg>PERIOD_TYPE,SDATE,EDATE,APP_CODE,OS_VERSION</arg>
+            <arg>--update-mode</arg>
+            <arg>allowinsert</arg>
+        </sqoop>
+        <ok to="join-stat"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="resolution-stat">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>hive_ading_resolution_stat.hql</script>
+            <param>DB=${hiveDatabase}</param>
+            <param>PERIOD_TYPE=${periodType}</param>
+            <param>PREFIX_PERIOD_TYPE=${prefixPeriodType}</param>
+            <param>START_YYYYMMDD=${fromYYYYMMDD}</param>
+            <param>END_YYYYMMDD=${toYYYYMMDD}</param>
+        </hive>
+        <ok to="resolution-stat-export"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="resolution-stat-export">
+        <sqoop xmlns="uri:oozie:sqoop-action:0.2">
+            <job-tracker>${jobTracker4DBif}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <arg>export</arg>
+            <arg>--connect</arg>
+            <arg>${oracleConnection}</arg>
+            <arg>--username</arg>
+            <arg>${oracleUser}</arg>
+            <arg>--password</arg>
+            <arg>${oraclePassword}</arg>
+            <arg>--table</arg>
+            <arg>ADING_RESOLUTION_STAT</arg>
+            <arg>--export-dir</arg>
+            <arg>${hiveHdfsDir}/${prefixPeriodType}_${toYYYYMMDD}_ading_resolution_stat</arg>
+            <arg>--input-fields-terminated-by</arg>
+            <arg>\t</arg>
+            <arg>--update-key</arg>
+            <arg>PERIOD_TYPE,SDATE,EDATE,APP_CODE,RESOLUTION</arg>
+            <arg>--update-mode</arg>
+            <arg>allowinsert</arg>
+        </sqoop>
+        <ok to="join-stat"/>
+        <error to="email-noti" />
+    </action>
+
+    <join name="join-stat" to="base-delete"/>
+
+    <action name="base-delete">
+        <hive xmlns="uri:oozie:hive-action:0.2">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <job-xml>${hiveSiteXML}</job-xml>
+            <configuration>
+                <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <script>hive_ading_base_delete.hql</script>
+            <param>DB=${hiveDatabase}</param>
+            <param>PREFIX_PERIOD_TYPE=${prefixPeriodType}</param>
+            <param>END_YYYYMMDD=${toYYYYMMDD}</param>
+        </hive>
+        <ok to="end"/>
+        <error to="email-noti" />
+    </action>
+
+    <action name="email-noti">
+        <email xmlns="uri:oozie:email-action:0.1">
+            <to>${emailNotiTo}</to>
+            <subject>[WF@${nameNode}]${(empty wf:lastErrorNode() )? 'SUCCESS' :	'FAILURE'} : ${wf:name()}(${wf:id()}, ${operYYYYMMDD})</subject>
+            <body>
+                <![CDATA[[${wf:name()}(${wf:id()})] in [${wf:appPath()}] at [${timestamp()}]<br>${(empty wf:lastErrorNode()) ? 'Workflow succeeded.' : 'Action failed.'}<br>${(empty wf:lastErrorNode()) ? '' : concat(concat(wf:lastErrorNode(), ' => '), wf:errorMessage(wf:lastErrorNode()))}<br>]]>
+            </body>
+        </email>
+        <ok to="kill" />
+        <error to="kill" />
+    </action>
+
+    <kill name="kill">
+        <message>Action failed, error message[${wf:errorMessage(wf:lastErrorNode())}]</message>
+    </kill>
+    <end name="end"/>
+</workflow-app>

@@ -1,0 +1,65 @@
+
+set mapreduce.job.reduces=128;
+
+set hivevar:daybefore;
+set hivevar:day90before;
+set hivevar:day91before;
+
+-- DROP TABLE IF EXISTS SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_TEMP4_NEW;
+-- CREATE TABLE SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_TEMP4_NEW
+-- (
+--  DMP_UID   STRING
+-- ,MOD_NAME  STRING
+-- ,MOD_MANUF STRING
+-- ,SERV_NAME STRING
+-- )
+-- CLUSTERED BY (DMP_UID) SORTED BY (DMP_UID) INTO 256 BUCKETS
+-- ROW FORMAT DELIMITED
+-- FIELDS TERMINATED BY ','
+-- ;
+
+
+-- INSERT INTO SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_TEMP4_NEW
+--
+-- SELECT
+--           T1.DMP_UID,
+--           T1.MOD_NAME,
+--           T1.MOD_MANUF,
+--           T1.SERV_NAME
+--           FROM
+--           (
+--
+--           SELECT  REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+--
+--
+--           CASE
+--           WHEN GAID IS NOT NULL AND LENGTH(GAID)=36 THEN CONCAT('(GAID)',GAID)
+--           WHEN IDFA IS NOT NULL AND LENGTH(IDFA)=36 THEN CONCAT('(IDFA)',IDFA)
+--           WHEN SUBSTR(DMP_UID,1,6)='(DMPD)' AND LENGTH(DMP_UID)=42 AND SUBSTR(DMP_UID,7) =  LOWER(SUBSTR(DMP_UID,7)) THEN CONCAT('(GAID)',SUBSTR(DMP_UID,7))
+--           WHEN SUBSTR(DMP_UID,1,6)='(DMPD)' AND LENGTH(DMP_UID)=42 AND SUBSTR(DMP_UID,7) <> LOWER(SUBSTR(DMP_UID,7)) THEN CONCAT('(IDFA)',SUBSTR(DMP_UID,7))
+--           ELSE DMP_UID
+--           END
+--
+--
+--           ,'\n',''),'\,',' '),'\;',' '),'\:',' ') AS DMP_UID
+--
+--           ,REFLECT('java.net.URLDecoder', 'decode', get_json_object(body, '$.col021')) AS MOD_NAME
+--           ,REFLECT('java.net.URLDecoder', 'decode', get_json_object(body, '$.col022')) AS MOD_MANUF
+--           ,REFLECT('java.net.URLDecoder', 'decode', get_json_object(body, '$.col023')) AS SERV_NAME
+--           ,ROW_NUMBER() OVER(PARTITION BY DMP_UID ORDER BY LOG_TIME DESC ) AS RN
+--           FROM DMP.LOG_SERVER_IDSYNC_COLLECT
+--           WHERE
+--               ( get_json_object(BODY, '$.col021') IS NOT NULL AND get_json_object(BODY, '$.col021') NOT IN ( '' , '%7B%7BmodelNm%7D%7D'         , '%7B%7Bdevice_model%7D%7D'        ))
+--           AND ( get_json_object(BODY, '$.col022') IS NOT NULL AND get_json_object(BODY, '$.col022') NOT IN ( '' , '%7B%7BmanufacturerNm%7D%7D'  , '%7B%7Bdevice_manufacturer%7D%7D' ))
+--           AND ( get_json_object(BODY, '$.col023') IS NOT NULL AND get_json_object(BODY, '$.col023') NOT IN ( '' , '%7B%7BserviceProvider%7D%7D' , '%7B%7Btelecom_name%7D%7D'        ))
+--           AND PART_HOUR BETWEEN '${hivevar:day90before}00' AND '${hivevar:daybefore}24'
+--           AND DSID = '63'
+--           AND DMP_UID IS NOT NULL AND DMP_UID <> '' AND (SUBSTR(DMP_UID,1,6) = '(DMPC)' OR (SUBSTR(DMP_UID,1,6) = '(DMPD)' AND ((GAID IS NOT NULL AND LENGTH(GAID)=36 AND GAID=LOWER(GAID)) OR (IDFA IS NOT NULL AND LENGTH(IDFA)=36 AND IDFA<>LOWER(IDFA)))))
+--
+--
+--           ) T1
+--           WHERE  T1.RN = 1
+--           ;
+
+
+

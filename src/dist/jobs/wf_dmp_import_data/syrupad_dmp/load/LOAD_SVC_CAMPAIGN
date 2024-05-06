@@ -1,0 +1,43 @@
+
+USE SVC_CSW1;
+
+INSERT OVERWRITE TABLE DMP_SVC_CAMPAIGN
+SELECT
+ CASE WHEN REGEXP_REPLACE(CAMPAIGN_SQ, ',', ' ') = 'null'                       THEN '' ELSE REGEXP_REPLACE(CAMPAIGN_SQ, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(CAMPAIGN_NM, ',', ' ') = 'null'                       THEN '' ELSE REGEXP_REPLACE(CAMPAIGN_NM, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(CAMPAIGN_TYPE_CD, ',', ' ') = 'null'                  THEN '' ELSE REGEXP_REPLACE(CAMPAIGN_TYPE_CD, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(REMARK, ',', ' ') = 'null'                            THEN '' ELSE REGEXP_REPLACE(REMARK, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(ADV_COMPANY_SQ, ',', ' ') = 'null'                    THEN '' ELSE REGEXP_REPLACE(ADV_COMPANY_SQ, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(ADV_ACCOUNT_SQ, ',', ' ') = 'null'                    THEN '' ELSE REGEXP_REPLACE(ADV_ACCOUNT_SQ, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(BIZREP_COMPANY_SQ, ',', ' ') = 'null'                 THEN '' ELSE REGEXP_REPLACE(BIZREP_COMPANY_SQ, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(BIZREP_ACCOUNT_SQ, ',', ' ') = 'null'                 THEN '' ELSE REGEXP_REPLACE(BIZREP_ACCOUNT_SQ, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(BIZREP_FEE_RATE, ',', ' ') = 'null'                   THEN '' ELSE REGEXP_REPLACE(BIZREP_FEE_RATE, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(BIZREP_EMAIL_REPORT_FL, ',', ' ') = 'null'            THEN '' ELSE REGEXP_REPLACE(BIZREP_EMAIL_REPORT_FL, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(REP_COMPANY_SQ, ',', ' ') = 'null'                    THEN '' ELSE REGEXP_REPLACE(REP_COMPANY_SQ, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(REP_ACCOUNT_SQ, ',', ' ') = 'null'                    THEN '' ELSE REGEXP_REPLACE(REP_ACCOUNT_SQ, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(REP_FEE_RATE, ',', ' ') = 'null'                      THEN '' ELSE REGEXP_REPLACE(REP_FEE_RATE, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(REP_EMAIL_REPORT_FL, ',', ' ') = 'null'               THEN '' ELSE REGEXP_REPLACE(REP_EMAIL_REPORT_FL, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(AGENCY_COMPANY_SQ, ',', ' ') = 'null'                 THEN '' ELSE REGEXP_REPLACE(AGENCY_COMPANY_SQ, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(AGENCY_ACCOUNT_SQ, ',', ' ') = 'null'                 THEN '' ELSE REGEXP_REPLACE(AGENCY_ACCOUNT_SQ, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(AGENCY_FEE_RATE, ',', ' ') = 'null'                   THEN '' ELSE REGEXP_REPLACE(AGENCY_FEE_RATE, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(AGENCY_EMAIL_REPORT_FL, ',', ' ') = 'null'            THEN '' ELSE REGEXP_REPLACE(AGENCY_EMAIL_REPORT_FL, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(MEDIA_FEE_RATE, ',', ' ') = 'null'                    THEN '' ELSE REGEXP_REPLACE(MEDIA_FEE_RATE, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(REPORT_ID, ',', ' ') = 'null'                         THEN '' ELSE REGEXP_REPLACE(REPORT_ID, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(REPORT_PASSWORD, ',', ' ') = 'null'                   THEN '' ELSE REGEXP_REPLACE(REPORT_PASSWORD, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(START_DT, ',', ' ') = 'null'                          THEN '' ELSE REGEXP_REPLACE(START_DT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(END_DT, ',', ' ') = 'null'                            THEN '' ELSE REGEXP_REPLACE(END_DT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(CAMPAIGN_STATUS_CD, ',', ' ') = 'null'                THEN '' ELSE REGEXP_REPLACE(CAMPAIGN_STATUS_CD, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(PAY_YM, ',', ' ') = 'null'                            THEN '' ELSE REGEXP_REPLACE(PAY_YM, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(PAY_COMPANY_TYPE_CD, ',', ' ') = 'null'               THEN '' ELSE REGEXP_REPLACE(PAY_COMPANY_TYPE_CD, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(PAY_COMPANY_SQ, ',', ' ') = 'null'                    THEN '' ELSE REGEXP_REPLACE(PAY_COMPANY_SQ, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(SOHO_FL, ',', ' ') = 'null'                           THEN '' ELSE REGEXP_REPLACE(SOHO_FL, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(SITE_CD, ',', ' ') = 'null'                           THEN '' ELSE REGEXP_REPLACE(SITE_CD, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(CREATE_DT, ',', ' ') = 'null'                         THEN '' ELSE REGEXP_REPLACE(CREATE_DT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(UPDATE_DT, ',', ' ') = 'null'                         THEN '' ELSE REGEXP_REPLACE(UPDATE_DT, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(CREATE_ACCOUNT_SQ, ',', ' ') = 'null'                 THEN '' ELSE REGEXP_REPLACE(CREATE_ACCOUNT_SQ, ',', ' ') END,
+ CASE WHEN REGEXP_REPLACE(UPDATE_ACCOUNT_SQ, ',', ' ') = 'null'                 THEN '' ELSE REGEXP_REPLACE(UPDATE_ACCOUNT_SQ, ',', ' ') END
+
+FROM TEMP_DMP_SVC_CAMPAIGN
+WHERE
+cast(CAMPAIGN_SQ as bigint) IS NOT NULL
+;

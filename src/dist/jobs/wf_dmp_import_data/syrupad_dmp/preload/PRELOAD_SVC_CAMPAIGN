@@ -1,0 +1,54 @@
+
+
+use SVC_CSW1;
+
+set hivevar:MetaPathHive;
+
+DROP TABLE IF EXISTS TEMP_DMP_SVC_CAMPAIGN;
+
+CREATE TABLE TEMP_DMP_SVC_CAMPAIGN
+(
+
+    CAMPAIGN_SQ            STRING,
+    CAMPAIGN_NM            STRING,
+    CAMPAIGN_TYPE_CD       STRING,
+    REMARK                 STRING,
+    ADV_COMPANY_SQ         STRING,
+    ADV_ACCOUNT_SQ         STRING,
+    BIZREP_COMPANY_SQ      STRING,
+    BIZREP_ACCOUNT_SQ      STRING,
+    BIZREP_FEE_RATE        STRING,
+    BIZREP_EMAIL_REPORT_FL STRING,
+    REP_COMPANY_SQ         STRING,
+    REP_ACCOUNT_SQ         STRING,
+    REP_FEE_RATE           STRING,
+    REP_EMAIL_REPORT_FL    STRING,
+    AGENCY_COMPANY_SQ      STRING,
+    AGENCY_ACCOUNT_SQ      STRING,
+    AGENCY_FEE_RATE        STRING,
+    AGENCY_EMAIL_REPORT_FL STRING,
+    MEDIA_FEE_RATE         STRING,
+    REPORT_ID              STRING,
+    REPORT_PASSWORD        STRING,
+    START_DT               STRING,
+    END_DT                 STRING,
+    CAMPAIGN_STATUS_CD     STRING,
+    PAY_YM                 STRING,
+    PAY_COMPANY_TYPE_CD    STRING,
+    PAY_COMPANY_SQ         STRING,
+    SOHO_FL                STRING,
+    SITE_CD                STRING,
+    AGENCY_FL              STRING,
+    CREATE_DT              STRING,
+    UPDATE_DT              STRING,
+    CREATE_ACCOUNT_SQ      STRING,
+    UPDATE_ACCOUNT_SQ      STRING
+
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '|';
+
+
+
+
+
+LOAD DATA INPATH '${hivevar:MetaPathHive}/svc_campaign/part-m-00000' INTO TABLE TEMP_DMP_SVC_CAMPAIGN;

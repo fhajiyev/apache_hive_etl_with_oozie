@@ -1,0 +1,49 @@
+
+
+use SVC_CSW1;
+
+set hivevar:MetaPathHive;
+
+DROP TABLE IF EXISTS TEMP_DMP_SVC_CREATIVE;
+
+CREATE TABLE TEMP_DMP_SVC_CREATIVE
+(
+   
+   CREATIVE_SQ                  STRING,
+   ACCOUNT_SQ                   STRING,
+   COMPANY_SQ                   STRING,
+   SLOT_SQ                      STRING,
+   CREATIVE_NM                  STRING,
+   CREATIVE_COMMENT             STRING,
+   CREATIVE_TYPE_CD             STRING,
+   VERTICAL_CREATIVE_URL        STRING,
+   VERTICAL_CREATIVE_BASE_URL   STRING,
+   EXPANDABLE_FL                STRING,
+   HORIZONTAL_CREATIVE_URL      STRING,
+   HORIZONTAL_CREATIVE_BASE_URL STRING,
+   CREATIVE_STATUS_CD           STRING,
+   CHANNEL_CD                   STRING,
+   MWEB_DELIVERY_TYPE_GB        STRING,
+   HTML_CODE                    STRING,
+   SOHO_FL                      STRING,
+   BG_COLOR                     STRING,
+   BG_COLOR_GB                  STRING,
+   TEXT_TITLE                   STRING,
+   TEXT_TITLE_COLOR             STRING,
+   TEXT_CONTENT                 STRING,
+   TEXT_CONTENT_COLOR           STRING,
+   HTML5_MRAID_VERSION_CD       STRING,
+   HTML5_ENC_TYPE_CD            STRING,
+   HTML_TYPE_CD                 STRING,
+   MOVIE_TITLE_NM               STRING,
+   TRACKING_YN                  STRING,
+   CREATE_DT                    STRING,
+   UPDATE_DT                    STRING,
+   CREATE_ACCOUNT_SQ            STRING,
+   UPDATE_ACCOUNT_SQ            STRING
+
+
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '|';
+
+LOAD DATA INPATH '${hivevar:MetaPathHive}/svc_creative/part-m-00000' INTO TABLE TEMP_DMP_SVC_CREATIVE;

@@ -1,0 +1,136 @@
+
+set hivevar:daybefore;
+set hivevar:day90before;
+set hivevar:day91before;
+
+ALTER TABLE SVC_DS_DMP.DMP_LOG_SERVER_TRACKING DROP IF EXISTS PARTITION(part_date=${hivevar:daybefore});
+
+set hive.exec.parallel = true;
+set mapreduce.job.reduces=128;
+set hive.execution.engine=tez;
+
+set hive.exec.dynamic.partition=true;
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+
+
+INSERT INTO TABLE SVC_DS_DMP.DMP_LOG_SERVER_TRACKING  partition(PART_DATE)
+SELECT REGEXP_REPLACE(SITE_UID,'[\n\,\;\:\r+]',' ') AS SITE_UID
+, LENGTH(SITE_UID)
+, REGEXP_REPLACE(get_json_object(BODY, '$.col005'),'[\n\,\;\:\r+]',' ') AS ACTION
+, SUBSTR(LOG_TIME,1,8) AS REQUEST_DATE
+, SUBSTR(LOG_TIME,9,2) AS REQUEST_TIME
+, REGEXP_REPLACE(get_json_object(BODY, '$.col001'),'[\n\,\;\:\r+]',' ') AS SITE
+, CASE WHEN get_json_object(BODY, '$.col005') IN ('search','welcome','sdest','rdest','fdest') THEN REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col007')),'[\n\,\;\:\r+]',' ') ELSE ' ' END AS ID
+, REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col016')),'[\n\,\;\:\r+]',' '), '\\\\\\/','\\/') AS PROD_NM
+, REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col009')),'[\n\,\;\r+]',' '), '\\\\\\/','\\/') AS CATEGORY_CD1
+, REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col010')),'[\n\,\;\r+]',' '), '\\\\\\/','\\/') AS CATEGORY_CD2
+, REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col011')),'[\n\,\;\r+]',' '), '\\\\\\/','\\/') AS CATEGORY_CD3
+, REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col012')),'[\n\,\;\r+]',' '), '\\\\\\/','\\/') AS CATEGORY_CD4
+, REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col013')),'[\n\,\;\r+]',' '), '\\\\\\/','\\/') AS CATEGORY_CD5
+, REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col014')),'[\n\,\;\r+]',' '), '\\\\\\/','\\/') AS CATEGORY_CD6
+, REGEXP_REPLACE(get_json_object(BODY, '$.col015'),'[\n\,\;\:\r+]',' ') AS PRODPRICE
+, PART_HOUR
+, REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col002')),'[\n\,\;\r+]',' ')
+, split(GAID, ',')[0]
+, split(IDFA, ',')[0]
+, null
+, split(get_json_object(BODY, '$.col006') , ',')[0]
+, null
+, null
+, split(DMP_UID , ',')[0]
+, split(get_json_object(BODY, '$.col022') , ',')[0]
+, split(get_json_object(BODY, '$.col019') , ',')[0]
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, '${hivevar:daybefore}' AS PART_DATE
+FROM  DMP.LOG_SERVER_IDSYNC_COLLECT
+WHERE get_json_object(BODY, '$.col001') IN ('2','9','10','11','17')
+AND   get_json_object(BODY, '$.col005') IN ('search','basket','orderDUP','wish','cdown','order','orderSKP','view','welcome','adclk','couponview','membershipview','coupondown','membershipdown','sdest','rdest','fdest')
+AND   PART_HOUR BETWEEN '${hivevar:daybefore}00' AND '${hivevar:daybefore}24'
+AND   DMP_UID IS NOT NULL AND DMP_UID <> ''
+;
+
+
+INSERT INTO TABLE SVC_DS_DMP.DMP_LOG_SERVER_TRACKING  partition(PART_DATE)
+SELECT REGEXP_REPLACE(get_json_object(BODY, '$.uid001'),'[\n\,\;\:\r+]',' ') AS SITE_UID
+, LENGTH(get_json_object(BODY, '$.uid001'))
+, null
+, SUBSTR(LOG_TIME,1,8) AS REQUEST_DATE
+, SUBSTR(LOG_TIME,9,2) AS REQUEST_TIME
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, PART_HOUR
+, null
+, split(GAID, ',')[0]
+, split(IDFA, ',')[0]
+, split(get_json_object(BODY, '$.uid004') , ',')[0]
+, null
+, split(get_json_object(BODY, '$.uid002') , ',')[0]
+, split(get_json_object(BODY, '$.uid005') , ',')[0]
+, split(DMP_UID , ',')[0]
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, null
+, '${hivevar:daybefore}' AS PART_DATE
+FROM  DMP.LOG_SERVER_IDSYNC_PIXEL
+WHERE PART_HOUR BETWEEN '${hivevar:daybefore}00' AND '${hivevar:daybefore}24'
+AND   DMP_UID IS NOT NULL AND DMP_UID <> ''
+;
+
+
+
+
+
+
+
+
+
+ALTER TABLE SVC_DS_DMP.DMP_LOG_SERVER_TRACKING DROP IF EXISTS PARTITION(part_date=${hivevar:day91before});
+
+

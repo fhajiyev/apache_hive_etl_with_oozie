@@ -1,0 +1,36 @@
+
+
+
+use SVC_CSW1;
+
+set hivevar:MetaPathHive;
+
+DROP TABLE IF EXISTS TEMP_DMP_POC_BIZ_SITE;
+
+CREATE TABLE TEMP_DMP_POC_BIZ_SITE
+(
+
+     SITE_CD                      STRING,
+     ACCOUNT_SQ                   STRING,
+     ADV_BRAND_NM                 STRING,
+     SITE_URL                     STRING,
+     PRODUCT_BASE_URL             STRING,
+     LOOKED_PRODUCT_PERIOD        STRING,
+     LOGO_IMG1                    STRING,
+     LOGO_IMG2                    STRING,
+     EP_TYPE_CD                   STRING,
+     EP_PATH                      STRING,
+     EP_LOAD_INTERVAL             STRING,
+     PRODUCT_IMG_CDN_BASE_URL     STRING,
+     PRODUCT_IMG_LOCATION_TYPE_CD STRING,
+     SITE_STATUS_CD               STRING,
+     CREATE_DT                    STRING,
+     UPDATE_DT                    STRING,
+     CREATE_ACCOUNT_SQ            STRING,
+     UPDATE_ACCOUNT_SQ            STRING
+
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '|';
+
+
+LOAD DATA INPATH '${hivevar:MetaPathHive}/poc_biz_site/part-m-00000' INTO TABLE TEMP_DMP_POC_BIZ_SITE;

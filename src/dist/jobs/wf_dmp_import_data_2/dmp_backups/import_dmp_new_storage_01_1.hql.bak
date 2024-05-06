@@ -1,0 +1,178 @@
+
+
+
+
+set hivevar:day2before;
+set hivevar:day5before;
+
+set hive.merge.mapfiles=true;
+set hive.merge.mapredfiles=true;
+set hive.merge.smallfiles.avgsize=67108864;
+set hive.merge.size.per.task=134217728;
+set hive.merge.tezfiles=true;
+
+set hive.execution.engine=tez;
+set tez.queue.name=COMMON;
+set hive.exec.parallel=true;
+
+insert overwrite table dmp_pi.prod_data_source_store partition (part_hour='${hivevar:day2before}00', data_source_id='1')
+
+
+SELECT
+   b.uid,
+   CASE
+       WHEN b.maxage > 0 THEN b.maxage
+       ELSE ''
+   END,
+   CASE
+       WHEN b.maxgen = 101 OR b.maxgen = 11 OR b.maxgen = 1 THEN 'M'
+       WHEN b.maxgen = 102 OR b.maxgen = 12 OR b.maxgen = 2 THEN 'F'
+       ELSE ''
+   END,
+
+   if(c.int_cross_agr_yn IS NULL, '', c.int_cross_agr_yn),
+   if(d.telco_nm         IS NULL, '',         d.telco_nm),
+   if(d.mfact_nm         IS NULL, '',         d.mfact_nm),
+   if(d.last_dur         IS NULL, '',         d.last_dur),
+
+   if(d.ocb_card_avg_inco_prsm_amt IS NULL, '',         CAST(d.ocb_card_avg_inco_prsm_amt AS DECIMAL)),
+   CASE
+      WHEN d.ocb_card_avg_inco_seg_cd IS NULL THEN ''
+      WHEN d.ocb_card_avg_inco_seg_cd like '%_P10'  THEN '1'
+      WHEN d.ocb_card_avg_inco_seg_cd like '%_P20'  THEN '2'
+      WHEN d.ocb_card_avg_inco_seg_cd like '%_P30'  THEN '3'
+      WHEN d.ocb_card_avg_inco_seg_cd like '%_P40'  THEN '4'
+      WHEN d.ocb_card_avg_inco_seg_cd like '%_P50'  THEN '5'
+      WHEN d.ocb_card_avg_inco_seg_cd like '%_P60'  THEN '6'
+      WHEN d.ocb_card_avg_inco_seg_cd like '%_P70'  THEN '7'
+      WHEN d.ocb_card_avg_inco_seg_cd like '%_P80'  THEN '8'
+      WHEN d.ocb_card_avg_inco_seg_cd like '%_P90'  THEN '9'
+      WHEN d.ocb_card_avg_inco_seg_cd like '%_P100' THEN '10'
+      ELSE ''
+   END,
+   if(d.evs_avg_consum_m12         IS NULL, '',         CAST(d.evs_avg_consum_m12 AS DECIMAL)),
+   CASE
+      WHEN d.evs_avg_consum_m12_seg_cd IS NULL THEN ''
+      WHEN d.evs_avg_consum_m12_seg_cd like '%_P10'  THEN '1'
+      WHEN d.evs_avg_consum_m12_seg_cd like '%_P20'  THEN '2'
+      WHEN d.evs_avg_consum_m12_seg_cd like '%_P30'  THEN '3'
+      WHEN d.evs_avg_consum_m12_seg_cd like '%_P40'  THEN '4'
+      WHEN d.evs_avg_consum_m12_seg_cd like '%_P50'  THEN '5'
+      WHEN d.evs_avg_consum_m12_seg_cd like '%_P60'  THEN '6'
+      WHEN d.evs_avg_consum_m12_seg_cd like '%_P70'  THEN '7'
+      WHEN d.evs_avg_consum_m12_seg_cd like '%_P80'  THEN '8'
+      WHEN d.evs_avg_consum_m12_seg_cd like '%_P90'  THEN '9'
+      WHEN d.evs_avg_consum_m12_seg_cd like '%_P100' THEN '10'
+      ELSE ''
+   END,
+   '','','','','','','','','','',
+   '','','','','','','','','','',
+   '','','','','','','','','','',
+   '','','','','','','','','','',
+   '','','','','','','','','','',
+   '','','','','','','','','','',
+   '','','','','','','','','','',
+   '','','','','','','','','','',
+   '','','','','','','','','','',
+   '${hivevar:day2before}00'
+
+
+   FROM
+   (
+
+   SELECT
+   a.uid           as uid,
+   MAX(a.age)      as maxage,
+   MAX(a.genclass) as maxgen
+   FROM
+
+   (
+
+      SELECT
+      ci                                   as uid,
+      CASE
+           WHEN age is null THEN 0
+           WHEN age > 0 THEN age
+           ELSE 0
+      END                                 as age,
+      CASE
+           WHEN sex_cd is null THEN 0
+           WHEN sex_cd = 'M' THEN 101             -- for M
+           WHEN sex_cd = 'F' THEN 102             -- for F
+           ELSE 0
+      END                                 as genclass -- values M F Z
+      FROM
+      svc_custpfdb.pdb_ocb_mbr
+      WHERE
+      ci IS NOT NULL AND ci <> '' AND ci <> '\n' AND ci not like '%\u0001%'
+      AND ((age IS NOT NULL AND age > 0) OR (sex_cd IS NOT NULL AND sex_cd IN ('M','F'))) -- valid age or valid gender present
+
+
+      UNION ALL
+
+      SELECT
+      ci                                                                        as uid,
+      CASE
+           WHEN age is null THEN 0
+           WHEN age > 0 THEN age
+           ELSE 0
+      END                                                                       as age,
+      CASE
+           WHEN sex_cd is null THEN 0
+           WHEN sex_cd = 'M' THEN 11                                                           -- for M
+           WHEN sex_cd = 'F' THEN 12                                                           -- for F
+           ELSE 0
+      END                                                                       as genclass -- values M F Z
+      FROM
+      svc_custpfdb.pdb_syr_mbr
+      WHERE
+      ci IS NOT NULL AND ci <> '' AND ci <> '\n' AND ci not like '%\u0001%'
+      AND ((age IS NOT NULL AND age > 0) OR (sex_cd IS NOT NULL AND sex_cd IN ('M','F'))) -- valid age or valid gender present
+
+
+      UNION ALL
+
+      SELECT
+      ci                           as uid,
+      CASE
+           WHEN age is null THEN 0
+           WHEN age > 0 THEN age
+           ELSE 0
+      END                         as age,
+      CASE
+           WHEN sex_cd is null THEN 0
+           WHEN sex_cd = 'M' THEN 1             -- for M
+           WHEN sex_cd = 'F' THEN 2             -- for F
+           ELSE 0
+      END                         as genclass -- values M F Z
+      FROM
+      svc_custpfdb.pdb_evs_mbr
+      WHERE
+      ci IS NOT NULL AND ci <> '' AND ci <> '\n' AND ci not like '%\u0001%'
+      AND ((age IS NOT NULL AND age > 0) OR (sex_cd IS NOT NULL AND sex_cd IN ('M','F'))) -- valid age or valid gender present
+
+
+
+   ) a
+   group by a.uid
+
+   ) b
+
+   LEFT JOIN
+
+   svc_custpfdb.pdb_ci_mbr c
+
+   ON
+   b.uid = c.ci
+
+   LEFT JOIN
+
+   svc_custpfdb.pdb_mp_com_f_info d
+
+   ON
+   b.uid = d.ci
+
+
+   WHERE b.maxage > 0 OR b.maxgen > 0
+;
+

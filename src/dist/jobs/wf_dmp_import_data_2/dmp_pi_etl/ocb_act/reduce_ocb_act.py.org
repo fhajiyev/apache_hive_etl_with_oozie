@@ -1,0 +1,85 @@
+#!/usr/bin/python
+#-*- coding: utf-8 -*-
+
+
+import sys
+prev_mbr_id = ''
+prev_tr = list()
+curr_tr = list()
+prev_ci = ''
+
+def print_result(ci, trs):
+#    for tr in trs:
+    t = [''] * 101
+    t[0] = ci
+
+    welcome = 0
+    push    = 0
+    feed    = 0
+
+
+    dict_feed = set()
+
+    t[1] = trs[0][0]
+    t[3] = trs[0][2]
+
+    for tr in trs:
+        if tr[1] == '00':
+            welcome += 1
+        elif tr[1] == '01':
+            t[5] = '01'
+            t[6] = tr[3]
+            print '\001'.join(t)
+
+        elif tr[1] == '02':
+            dict_feed.add(tr[4])
+
+    if welcome > 0:
+        t[5] = '00'
+        t[6] = ''
+        t[7] = ''
+        print '\001'.join(t)
+
+    for feed_one in dict_feed:
+        t[5] = '02'
+        t[6] = ''
+        t[7] = feed_one
+
+        print '\001'.join(t)
+
+for line in sys.stdin:
+    s = line.rstrip('\n').split('\t')
+
+    mbr_id = s[0]
+
+    if len(s) == 2:
+	ci = s[1]
+    else:
+	curr_tr = s[1:]
+
+    if prev_mbr_id == '':
+	prev_mbr_id = mbr_id
+	if len(s) == 2:
+            prev_ci     = ci
+	else:
+	    prev_tr = list()
+	    prev_tr.append(curr_tr)
+
+    if prev_mbr_id != mbr_id:
+	if len(prev_tr) > 0 and prev_ci != '':
+	    print_result(prev_ci, prev_tr)
+
+        prev_tr = list()
+	prev_ci = ''
+
+    prev_mbr_id = mbr_id
+    
+    if len(s) == 2:
+	prev_ci = ci
+    else:
+	prev_tr.append(curr_tr)
+
+if prev_mbr_id == mbr_id:
+    if len(prev_tr) > 0 and prev_ci != '':
+        print_result(prev_ci, prev_tr)
+

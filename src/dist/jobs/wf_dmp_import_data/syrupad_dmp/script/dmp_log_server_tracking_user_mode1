@@ -1,0 +1,439 @@
+
+set mapreduce.job.reduces=128;
+
+set hivevar:daybefore;
+set hivevar:day90before;
+set hivevar:day91before;
+
+DROP TABLE IF EXISTS SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_TEMP1_NEW;
+CREATE TABLE SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_TEMP1_NEW
+(
+ DMP_UID  STRING
+,AGE      STRING
+,GENCLASS STRING
+)
+CLUSTERED BY (DMP_UID) SORTED BY (DMP_UID) INTO 256 BUCKETS
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+;
+
+
+INSERT INTO SVC_DS_DMP.DMP_LOG_SERVER_TRACKING_USER_MODE_TEMP1_NEW
+
+       SELECT
+       t4.DMP_UID,
+       t4.AGE,
+       t4.GENCLASS
+
+       FROM
+       (
+
+       SELECT
+       t3.DMP_UID,
+       t3.AGE,
+       t3.GENCLASS,
+       ROW_NUMBER() OVER( PARTITION BY t3.DMP_UID ORDER BY t3.DSTYPE ) AS RN
+
+       FROM
+       (
+
+
+                  --11st service activity log
+
+                  SELECT
+                  t2.DMP_UID,
+                  t2.AGE,
+                  t2.GENCLASS,
+                  t2.DSTYPE
+
+                  FROM
+                  (
+
+                  SELECT
+                  t1.DMP_UID,
+                  t1.AGE,
+                  t1.GENCLASS,
+                  t1.DSTYPE,
+                  ROW_NUMBER() OVER(PARTITION BY t1.DMP_UID ORDER BY t1.LOG_TIME DESC ) AS RN
+
+                  FROM
+                  (
+                  SELECT  REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+
+
+                              CASE
+                              WHEN GAID IS NOT NULL AND LENGTH(GAID)=36 AND GAID=LOWER(GAID) AND GAID <> '00000000-0000-0000-0000-000000000000' THEN CONCAT('(GAID)',GAID)
+                              WHEN IDFA IS NOT NULL AND LENGTH(IDFA)=36 AND IDFA<>LOWER(IDFA) AND IDFA <> '00000000-0000-0000-0000-000000000000' THEN CONCAT('(IDFA)',IDFA)
+                              ELSE DMP_UID
+                              END
+
+
+                              ,'\n',''),'\,',' '),'\;',' '),'\:',' ') AS DMP_UID
+
+                                     ,CASE
+                                           WHEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col021')),'\n',''),'\,',' '),'\;',' '),'\:',' ') IN ('0','10','20','30','40','50','60','70','80','90')
+                                           THEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col021')),'\n',''),'\,',' '),'\;',' '),'\:',' ')
+                                           ELSE ''
+                                      END AS AGE
+                                     ,CASE
+                                           WHEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col020')),'\n',''),'\,',' '),'\;',' '),'\:',' ') IN ('4','8')
+                                           THEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col020')),'\n',''),'\,',' '),'\;',' '),'\:',' ')
+                                           ELSE ''
+                                      END AS GENCLASS
+                                     ,LOG_TIME
+                                     ,4 AS DSTYPE
+                                 FROM DMP.LOG_SERVER_IDSYNC_COLLECT
+
+                                WHERE PART_HOUR BETWEEN '${hivevar:day90before}00' AND '${hivevar:daybefore}24'
+                                  AND DSID = 'service_activity_log'
+                                  AND (
+                                          get_json_object(BODY, '$.col001') = '2'
+                                          AND get_json_object(BODY, '$.col005') in ( 'search','basket','orderDUP','wish','order','orderSKP','view')
+                                          AND NOT(get_json_object(BODY, '$.col001') = '2' AND get_json_object(BODY, '$.col019') = '7' AND LENGTH(SITE_UID) <> 36)
+                                       )
+                                  AND
+                                  (
+                                                (
+                                                       DMP_UID IS NOT NULL
+                                                         AND
+                                                       SUBSTR(DMP_UID,1,6) = '(DMPC)'
+                                                         AND
+                                                       DMP_UID <> '(DMPC)00000000-0000-0000-0000-000000000000'
+                                                )
+                                                OR
+                                                (
+                                                      (GAID IS NOT NULL AND LENGTH(GAID)=36 AND GAID= LOWER(GAID) AND GAID <> '00000000-0000-0000-0000-000000000000')
+                                                         OR
+                                                      (IDFA IS NOT NULL AND LENGTH(IDFA)=36 AND IDFA<>LOWER(IDFA) AND IDFA <> '00000000-0000-0000-0000-000000000000')
+                                                )
+                                  )
+
+                  ) t1
+
+                  WHERE t1.AGE IS NOT NULL AND t1.AGE <> '' AND t1.GENCLASS IS NOT NULL AND t1.GENCLASS <> ''
+                  ) t2
+                  WHERE t2.RN = 1
+
+
+
+               UNION ALL
+
+               --OCB SyrupWallet service activity log
+
+               SELECT
+               t2.DMP_UID,
+               t2.AGE,
+               t2.GENCLASS,
+               t2.DSTYPE
+
+               FROM
+               (
+
+               SELECT
+               t1.DMP_UID,
+               t1.AGE,
+               t1.GENCLASS,
+               t1.DSTYPE,
+               ROW_NUMBER() OVER(PARTITION BY t1.DMP_UID ORDER BY t1.LOG_TIME DESC ) AS RN
+
+               FROM
+               (
+
+               SELECT  REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+
+
+               CASE
+               WHEN GAID IS NOT NULL AND LENGTH(GAID)=36 AND GAID=LOWER(GAID) AND GAID <> '00000000-0000-0000-0000-000000000000' THEN CONCAT('(GAID)',GAID)
+               WHEN IDFA IS NOT NULL AND LENGTH(IDFA)=36 AND IDFA<>LOWER(IDFA) AND IDFA <> '00000000-0000-0000-0000-000000000000' THEN CONCAT('(IDFA)',IDFA)
+               ELSE DMP_UID
+               END
+
+
+               ,'\n',''),'\,',' '),'\;',' '),'\:',' ') AS DMP_UID
+
+                      ,CASE
+                            WHEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col007')),'\n',''),'\,',' '),'\;',' '),'\:',' ') IN ('0','10','20','30','40','50','60','70','80','90')
+                            THEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col007')),'\n',''),'\,',' '),'\;',' '),'\:',' ')
+                            ELSE ''
+                       END AS AGE
+                      ,CASE
+                            WHEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col018')),'\n',''),'\,',' '),'\;',' '),'\:',' ') IN ('4','8')
+                            THEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col018')),'\n',''),'\,',' '),'\;',' '),'\:',' ')
+                            ELSE ''
+                       END AS GENCLASS
+                      ,LOG_TIME
+                      ,CASE WHEN get_json_object(BODY, '$.col001') = '9' THEN 3 ELSE 1 END AS DSTYPE
+                  FROM DMP.LOG_SERVER_IDSYNC_COLLECT
+
+                 WHERE PART_HOUR BETWEEN '${hivevar:day90before}00' AND '${hivevar:daybefore}24'
+                   AND DSID = 'service_activity_log'
+                   AND ( get_json_object(BODY, '$.col001') IN ('9','10') AND get_json_object(BODY, '$.col005') = 'welcome' )
+                   AND
+                   (
+                                 (
+                                        DMP_UID IS NOT NULL
+                                          AND
+                                        SUBSTR(DMP_UID,1,6) = '(DMPC)'
+                                          AND
+                                        DMP_UID <> '(DMPC)00000000-0000-0000-0000-000000000000'
+                                 )
+                                 OR
+                                 (
+                                       (GAID IS NOT NULL AND LENGTH(GAID)=36 AND GAID= LOWER(GAID) AND GAID <> '00000000-0000-0000-0000-000000000000')
+                                          OR
+                                       (IDFA IS NOT NULL AND LENGTH(IDFA)=36 AND IDFA<>LOWER(IDFA) AND IDFA <> '00000000-0000-0000-0000-000000000000')
+                                 )
+                   )
+
+               ) t1
+
+               WHERE t1.AGE IS NOT NULL AND t1.AGE <> '' AND t1.GENCLASS IS NOT NULL AND t1.GENCLASS <> ''
+               ) t2
+               WHERE t2.RN = 1
+
+
+
+               UNION ALL
+
+               --11st dsid
+
+               SELECT
+               t2.DMP_UID,
+               t2.AGE,
+               t2.GENCLASS,
+               t2.DSTYPE
+
+               FROM
+               (
+
+               SELECT
+               t1.DMP_UID,
+               t1.AGE,
+               t1.GENCLASS,
+               t1.DSTYPE,
+               ROW_NUMBER() OVER(PARTITION BY t1.DMP_UID ORDER BY t1.LOG_TIME DESC ) AS RN
+
+               FROM
+               (
+
+               SELECT  REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+
+
+               CASE
+               WHEN GAID IS NOT NULL AND LENGTH(GAID)=36 AND GAID=LOWER(GAID) AND GAID <> '00000000-0000-0000-0000-000000000000' THEN CONCAT('(GAID)',GAID)
+               WHEN IDFA IS NOT NULL AND LENGTH(IDFA)=36 AND IDFA<>LOWER(IDFA) AND IDFA <> '00000000-0000-0000-0000-000000000000' THEN CONCAT('(IDFA)',IDFA)
+               ELSE DMP_UID
+               END
+
+
+               ,'\n',''),'\,',' '),'\;',' '),'\:',' ') AS DMP_UID
+
+                      ,CASE
+                            WHEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col018')),'\n',''),'\,',' '),'\;',' '),'\:',' ') IN ('0','10','20','30','40','50','60','70','80','90')
+                            THEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col018')),'\n',''),'\,',' '),'\;',' '),'\:',' ')
+                            ELSE ''
+                       END AS AGE
+
+                      ,CASE
+                            WHEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col017')),'\n',''),'\,',' '),'\;',' '),'\:',' ') IN ('4','8')
+                            THEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col017')),'\n',''),'\,',' '),'\;',' '),'\:',' ')
+                            ELSE ''
+                       END AS GENCLASS
+                      ,LOG_TIME
+                      ,4 AS DSTYPE
+               FROM DMP.LOG_SERVER_IDSYNC_COLLECT
+
+               WHERE PART_HOUR BETWEEN '${hivevar:day90before}00' AND '${hivevar:daybefore}24'
+               AND DSID = '63'
+               AND
+               (
+                                                (
+                                                       DMP_UID IS NOT NULL
+                                                         AND
+                                                       SUBSTR(DMP_UID,1,6) = '(DMPC)'
+                                                         AND
+                                                       DMP_UID <> '(DMPC)00000000-0000-0000-0000-000000000000'
+                                                )
+                                                OR
+                                                (
+                                                      (GAID IS NOT NULL AND LENGTH(GAID)=36 AND GAID= LOWER(GAID) AND GAID <> '00000000-0000-0000-0000-000000000000')
+                                                         OR
+                                                      (IDFA IS NOT NULL AND LENGTH(IDFA)=36 AND IDFA<>LOWER(IDFA) AND IDFA <> '00000000-0000-0000-0000-000000000000')
+                                                )
+               )
+
+               ) t1
+
+               WHERE t1.AGE IS NOT NULL AND t1.AGE <> '' AND t1.GENCLASS IS NOT NULL AND t1.GENCLASS <> ''
+               ) t2
+               WHERE t2.RN = 1
+
+
+
+
+               UNION ALL
+
+               --SyrupWallet dsid
+
+
+               SELECT
+               t2.DMP_UID,
+               t2.AGE,
+               t2.GENCLASS,
+               t2.DSTYPE
+
+               FROM
+               (
+
+               SELECT
+               t1.DMP_UID,
+               t1.AGE,
+               t1.GENCLASS,
+               t1.DSTYPE,
+               ROW_NUMBER() OVER(PARTITION BY t1.DMP_UID ORDER BY t1.LOG_TIME DESC ) AS RN
+
+               FROM
+               (
+
+
+               SELECT  REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+
+
+               CASE
+               WHEN GAID IS NOT NULL AND LENGTH(GAID)=36 AND GAID=LOWER(GAID) AND GAID <> '00000000-0000-0000-0000-000000000000' THEN CONCAT('(GAID)',GAID)
+               WHEN IDFA IS NOT NULL AND LENGTH(IDFA)=36 AND IDFA<>LOWER(IDFA) AND IDFA <> '00000000-0000-0000-0000-000000000000' THEN CONCAT('(IDFA)',IDFA)
+               ELSE DMP_UID
+               END
+
+
+               ,'\n',''),'\,',' '),'\;',' '),'\:',' ') AS DMP_UID
+
+                      ,CASE
+                            WHEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col020')),'\n',''),'\,',' '),'\;',' '),'\:',' ') IN ('0','10','20','30','40','50','60','70','80','90')
+                            THEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col020')),'\n',''),'\,',' '),'\;',' '),'\:',' ')
+                            ELSE ''
+                       END AS AGE
+
+                      ,CASE
+                            WHEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col019')),'\n',''),'\,',' '),'\;',' '),'\:',' ') IN ('4','8')
+                            THEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col019')),'\n',''),'\,',' '),'\;',' '),'\:',' ')
+                            ELSE ''
+                       END AS GENCLASS
+                      ,LOG_TIME
+                      ,1 AS DSTYPE
+               FROM DMP.LOG_SERVER_IDSYNC_COLLECT
+
+               WHERE PART_HOUR BETWEEN '${hivevar:day90before}00' AND '${hivevar:daybefore}24'
+               AND DSID = '65'
+               AND
+               (
+                                                               (
+                                                                      DMP_UID IS NOT NULL
+                                                                        AND
+                                                                      SUBSTR(DMP_UID,1,6) = '(DMPC)'
+                                                                        AND
+                                                                      DMP_UID <> '(DMPC)00000000-0000-0000-0000-000000000000'
+                                                               )
+                                                               OR
+                                                               (
+                                                                     (GAID IS NOT NULL AND LENGTH(GAID)=36 AND GAID= LOWER(GAID) AND GAID <> '00000000-0000-0000-0000-000000000000')
+                                                                        OR
+                                                                     (IDFA IS NOT NULL AND LENGTH(IDFA)=36 AND IDFA<>LOWER(IDFA) AND IDFA <> '00000000-0000-0000-0000-000000000000')
+                                                               )
+               )
+
+               ) t1
+
+               WHERE t1.AGE IS NOT NULL AND t1.AGE <> '' AND t1.GENCLASS IS NOT NULL AND t1.GENCLASS <> ''
+               ) t2
+               WHERE t2.RN = 1
+
+
+
+               UNION ALL
+
+               --OCB Lock dsid
+
+               SELECT
+               t2.DMP_UID,
+               t2.AGE,
+               t2.GENCLASS,
+               t2.DSTYPE
+
+               FROM
+               (
+
+               SELECT
+               t1.DMP_UID,
+               t1.AGE,
+               t1.GENCLASS,
+               t1.DSTYPE,
+               ROW_NUMBER() OVER(PARTITION BY t1.DMP_UID ORDER BY t1.LOG_TIME DESC ) AS RN
+
+               FROM
+               (
+
+
+
+               SELECT  REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+
+
+               CASE
+               WHEN GAID IS NOT NULL AND LENGTH(GAID)=36 AND GAID=LOWER(GAID) AND GAID <> '00000000-0000-0000-0000-000000000000' THEN CONCAT('(GAID)',GAID)
+               WHEN IDFA IS NOT NULL AND LENGTH(IDFA)=36 AND IDFA<>LOWER(IDFA) AND IDFA <> '00000000-0000-0000-0000-000000000000' THEN CONCAT('(IDFA)',IDFA)
+               ELSE DMP_UID
+               END
+
+
+               ,'\n',''),'\,',' '),'\;',' '),'\:',' ') AS DMP_UID
+
+                      ,CASE
+                            WHEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col008')),'\n',''),'\,',' '),'\;',' '),'\:',' ') IN ('0','10','20','30','40','50','60','70','80','90')
+                            THEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col008')),'\n',''),'\,',' '),'\;',' '),'\:',' ')
+                            ELSE ''
+                       END AS AGE
+
+                      ,CASE
+                            WHEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col007')),'\n',''),'\,',' '),'\;',' '),'\:',' ') IN ('4','8')
+                            THEN REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(reflect('java.net.URLDecoder', 'decode', get_json_object(BODY, '$.col007')),'\n',''),'\,',' '),'\;',' '),'\:',' ')
+                            ELSE ''
+                       END AS GENCLASS
+                      ,LOG_TIME
+                      ,2 AS DSTYPE
+               FROM DMP.LOG_SERVER_IDSYNC_COLLECT
+
+               WHERE PART_HOUR BETWEEN '${hivevar:day90before}00' AND '${hivevar:daybefore}24'
+               AND DSID = '89'
+               AND
+               (
+                                                                              (
+                                                                                     DMP_UID IS NOT NULL
+                                                                                       AND
+                                                                                     SUBSTR(DMP_UID,1,6) = '(DMPC)'
+                                                                                       AND
+                                                                                     DMP_UID <> '(DMPC)00000000-0000-0000-0000-000000000000'
+                                                                              )
+                                                                              OR
+                                                                              (
+                                                                                    (GAID IS NOT NULL AND LENGTH(GAID)=36 AND GAID= LOWER(GAID) AND GAID <> '00000000-0000-0000-0000-000000000000')
+                                                                                       OR
+                                                                                    (IDFA IS NOT NULL AND LENGTH(IDFA)=36 AND IDFA<>LOWER(IDFA) AND IDFA <> '00000000-0000-0000-0000-000000000000')
+                                                                              )
+               )
+
+               ) t1
+
+               WHERE t1.AGE IS NOT NULL AND t1.AGE <> '' AND t1.GENCLASS IS NOT NULL AND t1.GENCLASS <> ''
+               ) t2
+               WHERE t2.RN = 1
+
+
+
+
+
+       ) t3
+
+       ) t4
+       WHERE t4.RN = 1
+;
+

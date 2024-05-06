@@ -1,0 +1,31 @@
+apply plugin: 'application'
+
+configurations {
+    archivesBaseName = 'mysql-action'
+
+    applicationName = 'dmp-oozie-jobs'
+    mainClassName = 'com.skplanet.dmp.oozie.MySqlAction'
+    version = ''
+}
+
+dependencies {
+    compile "mysql:mysql-connector-java"
+    compile name: "spark-als"
+    compile name: "mahout-examples-0.11.1-job"
+    compile name: "commons-codec-1.9"
+    compile name: "commons-logging-1.0.4"
+    compile name: "httpclient-4.4"
+    compile name: "httpcore-4.4"
+    compile name: "jackson-annotations-2.3.0"
+    compile name: "jackson-core-2.3.3"
+    compile name: "jackson-databind-2.3.3"
+    compile name: "libthrift-0.9.3"
+    compile name: "log4j-1.2.17"
+    compile name: "querycache-jdbc-0.20.3"
+    compile name: "slf4j-api-1.7.10"
+    compile name: "slf4j-api-1.7.5"
+    compile name: "slf4j-log4j12-1.7.5"
+    compile name: "slf4j-simple-1.7.5-sources"
+    compile name: "xmemcached-2.0.0"
+
+}
